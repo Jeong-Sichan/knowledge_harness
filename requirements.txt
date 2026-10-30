@@ -1,4 +1,6 @@
 anthropic>=2.3.0
 pydantic>=2
 graphiti-core>=0.31.2
+# graphiti-core가 import하지만 의존성으로 선언하지 않은 패키지
+httpx
 pytest

@@ -4,10 +4,15 @@
 """
 import asyncio
 import os
+import sys
 from datetime import datetime, timezone
 
 from graphiti_core import Graphiti
 from graphiti_core.nodes import EpisodeType
+
+# Windows(cp949) 터미널에서도 한글·기호 출력이 깨지거나 멈추지 않게 한다
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
 async def main():

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from harness import ComposerConfig, Harness, Query, Record
@@ -17,6 +18,10 @@ from .metrics import score_query, summarize
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
+
+# Windows(cp949) 터미널에서도 한글·기호 출력이 깨지거나 멈추지 않게 한다
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 ABLATIONS = {
     "harness-no_conditions": {"cfg": ComposerConfig(use_conditions=False)},

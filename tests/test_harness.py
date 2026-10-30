@@ -74,3 +74,31 @@ def test_pii_guard_ignores_normal_numbers():
     from harness.pii import PIIGuard
     text, kinds = PIIGuard().mask("XGBoost AUC 0.842, learning_rate 0.05, 피처 12개")
     assert kinds == [] and "0.842" in text
+
+
+def test_graphiti_adapter_maps_episodes_to_records():
+    """Neo4j 없이 가짜 Graphiti 객체로 어댑터의 매핑 로직만 확인한다."""
+    import pytest
+    pytest.importorskip("graphiti_core")
+    from types import SimpleNamespace as NS
+    from baselines.graphiti_baseline import GraphitiBaseline
+
+    class FakeGraphiti:
+        def __init__(self):
+            self.n = 0
+        async def build_indices_and_constraints(self): pass
+        async def add_episode(self, **kw):
+            self.n += 1
+            return NS(episode=NS(uuid=f"ep{self.n}"), edges=[])
+        async def search(self, query, group_ids=None, num_results=10):
+            return [NS(fact="XGBoost가 가장 좋다", episodes=["ep1", "ep2"], invalid_at=None, expired_at=None),
+                    NS(fact="LightGBM이 더 좋다", episodes=["ep3"], invalid_at="2026-09-29", expired_at=None)]
+        async def close(self): pass
+
+    recs = [Record.from_dict(r) for r in json.loads((DATA / "records.json").read_text(encoding="utf-8"))][:3]
+    gb = GraphitiBaseline(graphiti=FakeGraphiti(), group_id="t")
+    gb.ingest(recs)
+    resp = gb.ask(Query("x", "모델?"))
+    assert resp.supporting_ids == ["R01", "R02"]   # 무효 처리된 사실은 제외
+    assert resp.team_fact_ids == resp.supporting_ids
+    gb.close()

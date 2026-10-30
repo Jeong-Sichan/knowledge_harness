@@ -61,6 +61,9 @@ python -m eval.run_eval --systems harness,full_context_llm   # ANTHROPIC_API_KEY
 python -m eval.run_eval --systems harness,graphiti           # Neo4j + OPENAI_API_KEY 필요
 ```
 
+Graphiti는 Neo4j 접속 정보를 환경변수(`NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`)로 받는다.
+본 실험 전에 `python -m scripts.graphiti_smoke`로 연결을 확인한다.
+
 결과는 `results/<system>.json`에 질문별로 저장된다.
 
 ## 현재 결과 (합성 데이터 14문항)

@@ -1,4 +1,4 @@
 anthropic>=2.3.0
 pydantic>=2
-graphiti-core
+graphiti-core>=0.31.2
 pytest

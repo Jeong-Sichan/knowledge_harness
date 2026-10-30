@@ -92,6 +92,11 @@ def main() -> None:
             print(f"[{name}] 인용 검증 캐시: {system.verifier.stats}")
         if getattr(system, "pii_guard", None) is not None:
             print(f"[{name}] PII 차단: {system.pii_guard.stats}")
+        if hasattr(system, "invalidated_facts"):
+            inv = system.invalidated_facts()
+            print(f"[{name}] Graphiti가 무효 처리한 사실 {len(inv)}개 (조건이 다른데 무효화됐는지 확인할 것)")
+            for fact, when in inv:
+                print(f"      - {fact}  (무효 시점 {when})")
         if hasattr(system, "close"):
             system.close()
 

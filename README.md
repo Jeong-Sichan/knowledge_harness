@@ -73,13 +73,22 @@ python -m eval.run_eval --answerer llm --systems retrieval_only,full_context_llm
 - 기본 모델은 Graphiti 기본값과 같은 `gpt-6-luna`다. `HARNESS_ANSWER_MODEL`, `HARNESS_SMALL_MODEL`로 바꿀 수 있다.
 - LLM 응답은 `.cache/llm_cache.json`에 캐시되어 다시 돌려도 비용이 들지 않는다.
 - Graphiti는 Neo4j 접속 정보를 환경변수(`NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`)로 받는다. 먼저 `python -m scripts.graphiti_smoke`로 연결을 확인한다.
-- 결과는 `results/<system>[-llm].json`에 질문별로 저장된다.
+- 결과는 `results/<system>[-llm][-scaleN].json`에 질문별로 저장된다.
+
+규모 실험: `--scale N`으로 주제와 문장은 비슷하지만 조건이 다른 방해 기록 N개를 섞는다. 정답 라벨은 그대로 유효하다.
+
+```bash
+python -m eval.run_eval --answerer llm --scale 100 --systems retrieval_only,full_context_llm,harness --no-ablation
+```
+
+LLM 모드 하네스는 기록마다 구조화 1회와 PII 판정 2회를 호출한다. 그래서 `--scale 300`이면 약 900회다.
+처음에는 100으로 돌려보고, 앞단 모델은 `HARNESS_SMALL_MODEL`로 더 싼 모델을 지정할 수 있다.
 
 ## 현재 결과
 
 ### rule 모드 (모듈 동작 확인용, 합성 데이터 14문항)
 
-| system | condition_match ↑ | status_acc ↑ | overgeneralization ↓ | irrelevant_used ↓ | false_consensus ↓ | bad_citation_used ↓ | evidence_error ↓ | pii_leak ↓ |
+| system | condition_match ↑ | status_acc ↑ | overgeneralization ↓ | irrelevant_used ↓ | false_consensus ↓ | bad_citation_used ↓ | evidence_error ↓ | pii_in_context ↓ |
 |---|---|---|---|---|---|---|---|---|
 | retrieval_only | 0.00 | 0.43 | 0.71 | 0.93 | 1.00 | 0.14 | 2.21 | 0.14 |
 | **harness** | 1.00 | 1.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.07 |
@@ -91,11 +100,15 @@ python -m eval.run_eval --answerer llm --systems retrieval_only,full_context_llm
 
 > **주의.** rule 모드의 하네스는 정답 구조를 받으므로 1.00은 성능 주장이 아니다.
 > 이 표는 각 모듈을 끄면 어느 메트릭이 나빠지는지만 보여준다.
-> rule 모드의 PII 차단은 정규식만 써서 고객 실명은 못 가린다(pii_leak 0.07). llm 모드에서는 작은 모델로 실명도 찾는다.
+> rule 모드의 PII 차단은 정규식만 써서 고객 실명은 못 가린다(pii_in_context 0.07). llm 모드에서는 작은 모델로 실명도 찾는다.
 
 ### llm 모드 (공정 비교)
 
-아직 실행 전이다. Graphiti 1차 실행 결과와 거기서 발견한 사례는 [docs/experiments.md](docs/experiments.md)에 있다.
+2차 실행 결과와 해석은 [docs/experiments.md](docs/experiments.md)에 있다. 요약하면 이렇다.
+- 기록 15개에서는 강한 LLM에 기록을 다 넣어도 정확도가 하네스와 거의 같다.
+- Graphiti는 요약 과정에서 조건, 승인, 작성자 메타데이터를 잃어 0.36에 그쳤다.
+- 하네스만 민감 정보를 맥락에도 답변에도 내보내지 않았다.
+- 다음은 기록이 많아질 때의 규모 실험이다.
 
 ## 디렉터리
 

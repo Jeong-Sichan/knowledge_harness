@@ -24,19 +24,23 @@ class PIIGuard:
         self.llm_detector = llm_detector  # 텍스트 → 가려야 할 문자열 목록. 작은 모델 자리.
         self.stats = {"checked": 0, "masked_records": 0, "masked_spans": 0}
 
-    def find(self, text: str) -> list[tuple[str, str]]:
-        """[(종류, 문자열), ...]"""
-        hits = [(kind, m.group()) for kind, pat in PATTERNS.items() for m in pat.finditer(text)]
-        if self.llm_detector is not None:
-            hits += [("llm", s) for s in self.llm_detector(text) if s]
-        return hits
+    def mask(self, text: str, deep: bool = True) -> tuple[str, list[str]]:
+        """가린 텍스트와 발견한 종류 목록을 돌려준다.
 
-    def mask(self, text: str) -> tuple[str, list[str]]:
-        """가린 텍스트와 발견한 종류 목록을 돌려준다."""
+        정규식으로 먼저 가린 뒤에 남은 텍스트만 모델 판정(llm_detector)에 넘긴다.
+        그래서 전화번호·이메일·키는 판정 모델에도 가지 않는다(실명은 간다 → 운영에서는 로컬 NER 모델 권장).
+        deep=False면 정규식만 쓴다(짧은 값·인용처럼 이미 본문에서 검사한 조각).
+        """
         self.stats["checked"] += 1
         kinds = []
-        for kind, span in self.find(text):
-            text = text.replace(span, f"[{kind.upper()} 가림]")
-            kinds.append(kind)
-            self.stats["masked_spans"] += 1
+        for kind, pat in PATTERNS.items():
+            for span in set(m.group() for m in pat.finditer(text)):
+                text = text.replace(span, f"[{kind.upper()} 가림]")
+                kinds.append(kind)
+        if deep and self.llm_detector is not None:
+            for span in self.llm_detector(text):
+                if span and span in text:
+                    text = text.replace(span, "[NAME 가림]")
+                    kinds.append("name")
+        self.stats["masked_spans"] += len(kinds)
         return text, kinds

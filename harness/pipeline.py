@@ -58,8 +58,11 @@ class Harness:
         rec.topic, rec.value, rec.conditions = structure_record(rec.text, source, known)
 
     def ingest(self, records: list[Record]) -> None:
-        for r in sorted(records, key=lambda r: r.created_at):
+        ordered = sorted(records, key=lambda r: r.created_at)
+        for i, r in enumerate(ordered, 1):
             self.store.add(r)
+            if self.structure == "llm" and (i % 25 == 0 or i == len(ordered)):
+                print(f"  [{self.name}] 기록 구조화 {i}/{len(ordered)}", flush=True)
 
     def ask(self, q: Query) -> Response:
         self.stats["queries"] += 1

@@ -46,10 +46,10 @@ class RecordStore:
         """인용 검증은 원문 기준으로 끝났으므로 공유되는 사본에서 민감 정보를 가린다."""
         kinds: list[str] = []
         rec.text, k = self.pii_guard.mask(rec.text); kinds += k
-        rec.value, k = self.pii_guard.mask(rec.value); kinds += k
+        rec.value, k = self.pii_guard.mask(rec.value, deep=False); kinds += k
         masked = []
         for e in rec.evidence:
-            quote, k = self.pii_guard.mask(e.quote); kinds += k
+            quote, k = self.pii_guard.mask(e.quote, deep=False); kinds += k
             masked.append(Evidence(e.source, e.rev, quote))
         rec.evidence = masked
         rec.pii_types = sorted(set(kinds))

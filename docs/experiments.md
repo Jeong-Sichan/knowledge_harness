@@ -103,3 +103,22 @@ full_context는 기록 수에 비례해 커진다.
   2. 필요한 기록만, 민감 정보를 가린 채 넘기는 효율과 PII 차단
   3. 기록이 많아질 때의 정확도 유지 (규모 실험으로 확인할 것)
 - 3차: `--scale 100`, `--scale 300`으로 같은 비교를 다시 한다. 정확도, `context_chars`, PII를 함께 본다.
+
+## 3차: 규모 실험 (`--answerer llm --scale 100`, 기록 115개)
+
+| system | condition_match | status_acc | evidence_error | pii_in_context | pii_in_answer | context_chars |
+|---|---|---|---|---|---|---|
+| retrieval_only | 0.93 | 0.93 | 0.07 | 0.43 | 0.07 | 1,575 |
+| full_context_llm | 0.86 | 0.86 | 0.14 | 1.00 | 0.00 | 31,801 |
+| harness | **1.00** | **1.00** | **0.00** | **0.00** | **0.00** | **653** |
+
+나머지 지표(overgeneralization, irrelevant_used, false_consensus, bad_citation_used)는 세 시스템 모두 0.00이다.
+LLM 호출은 268회, 캐시 재사용은 133회였다.
+
+### 해석
+
+- **맥락 크기 (가장 확실한 결과):** 하네스는 full_context의 **약 2%(1/49)** 맥락으로 같거나 더 높은 정확도를 냈다. retrieval_only와 비교해도 약 41% 수준이다.
+  full_context의 맥락은 기록 수에 비례한다. 기록 15개일 때 약 4,050자였고 115개일 때 약 31,800자다.
+- **PII:** 하네스만 맥락과 답변 모두 0이다. retrieval_only는 이번에도 답변에 민감 정보가 1번 나왔다.
+- **정확도:** 기록이 15개에서 115개로 늘자 full_context는 0.93에서 0.86으로 내려갔고 하네스는 1.00을 유지했다.
+  하지만 질문이 14개라서 1~2문항 차이다. **추세라고 주장하려면 seed를 바꾼 반복 실행이나 질문 추가가 필요하다.**

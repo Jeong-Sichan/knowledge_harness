@@ -39,8 +39,17 @@ def _load_cache() -> dict[str, dict]:
 
 
 def _save_cache() -> None:
+    """다른 실행이 동시에 쓴 항목을 합친 뒤 임시 파일 → 교체로 저장한다(터미널 두 개로 동시에 돌려도 안전)."""
     _CACHE_PATH.parent.mkdir(exist_ok=True)
-    _CACHE_PATH.write_text(json.dumps(_cache, ensure_ascii=False, indent=1), encoding="utf-8")
+    if _CACHE_PATH.exists():
+        try:
+            on_disk = json.loads(_CACHE_PATH.read_text(encoding="utf-8"))
+            _cache.update({k: v for k, v in on_disk.items() if k not in _cache})
+        except (json.JSONDecodeError, OSError):
+            pass
+    tmp = _CACHE_PATH.with_suffix(f".{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(_cache, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, _CACHE_PATH)
 
 
 def _parse(model: str, prompt: str, schema: type[BaseModel]) -> BaseModel:

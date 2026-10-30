@@ -53,9 +53,10 @@ python -m eval.run_eval -v      # 하네스 vs 약한 베이스라인 + ablation
 python -m pytest -q tests       # 모듈 단위 테스트 (pytest 필요)
 ```
 
-LLM 베이스라인과 Graphiti 베이스라인은 추가 설치가 필요하다.
+LLM 베이스라인과 Graphiti 베이스라인은 추가 설치가 필요하다. 가상환경 안에 설치한다.
 
 ```bash
+python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python -m eval.run_eval --systems harness,full_context_llm   # ANTHROPIC_API_KEY 필요
 python -m eval.run_eval --systems harness,graphiti           # Neo4j + OPENAI_API_KEY 필요

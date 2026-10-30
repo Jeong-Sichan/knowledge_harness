@@ -294,7 +294,8 @@
     "status": "approved",
     "_gold_pii": [
       "010-2345-6789",
-      "minsu.kim@example.com"
+      "minsu.kim@example.com",
+      "김민수"
     ],
     "_note": "개인정보(전화번호, 이메일)가 섞인 기록. 팀 공유 시 가려져야 한다. 값은 모두 가짜."
   },

@@ -3,7 +3,8 @@
 질문 단위로 아래를 계산한 뒤 평균한다.
 - condition_match   (메인) 조건에 맞는 답변: 상태가 맞고, 조건 밖·인용 오류·무관한 근거를 쓰지 않음
 - status_acc        답변 상태(answered/conflict/only_unapproved/no_evidence) 정확도
-- overgeneralization 질문 조건과 맞지 않는 기록을 근거로 씀(과잉 일반화)
+- overgeneralization 같은 주제에서 질문 조건과 맞지 않는 기록을 근거로 씀(과잉 일반화)
+- irrelevant_used   질문과 다른 주제의 기록을 근거로 씀(검색 품질 문제, 과잉 일반화와 구분)
 - false_consensus   승인 전 후보를 팀 사실로 제시함(잘못된 합의)
 - bad_citation_used 원문과 맞지 않는 인용을 근거로 씀
 - evidence_error    독립 근거 수 오차(재인용을 독립 근거로 세면 커짐)
@@ -43,7 +44,8 @@ def score_query(gold: dict, resp: Response, records: dict[str, dict]) -> QuerySc
     return QueryScore(
         qid=gold["id"],
         status_ok=resp.status == gold["expected_status"],
-        overgeneralization=any(not is_compatible(cond, r.get("conditions", {})) for r in used),
+        overgeneralization=any(r["topic"] == gold["topic"] and not is_compatible(cond, r.get("conditions", {}))
+                               for r in used),
         false_consensus=any(r.get("status") != APPROVED for r in facts),
         bad_citation_used=any(r.get("_gold_citation_valid") is False for r in used),
         irrelevant_used=any(r["topic"] != gold["topic"] for r in used),
@@ -61,6 +63,7 @@ def summarize(scores: list[QueryScore]) -> dict[str, float]:
         "overgeneralization": rate(lambda s: s.overgeneralization),
         "false_consensus": rate(lambda s: s.false_consensus),
         "bad_citation_used": rate(lambda s: s.bad_citation_used),
+        "irrelevant_used": rate(lambda s: s.irrelevant_used),
         "evidence_error": rate(lambda s: s.evidence_error),
         "pii_leak": rate(lambda s: s.pii_leak),
     }

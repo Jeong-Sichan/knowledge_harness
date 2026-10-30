@@ -46,46 +46,56 @@ flowchart LR
 
 ## 실행
 
-외부 의존성 없이 Python 3.10 이상에서 바로 돌아간다.
+평가는 두 가지 모드로 돌린다.
+
+| 모드 | 하네스 입력 | 답변 | 용도 |
+|---|---|---|---|
+| `rule` (기본) | 정답 구조(topic·조건)를 받음 | 템플릿 | 모듈 개발, ablation. 오프라인 |
+| `llm` | **자유 텍스트 기록 + 질문 문장만** (구조화·질문 파싱도 LLM으로 직접) | **모든 시스템이 같은 LLM 답변기** | 베이스라인과 공정 비교 |
+
+`llm` 모드에서는 모든 시스템이 같은 원재료(기록 원본 + 인용한 원문 문서)를 받는다.
+답변도 같은 프롬프트, 같은 모델로 한다. 그래서 결과 차이는 답변기에 넘기는 맥락, 즉 기억 계층에서만 생긴다.
 
 ```bash
-python -m eval.run_eval -v      # 하네스 vs 약한 베이스라인 + ablation, 질문별 답변 출력
-python -m pytest -q tests       # 모듈 단위 테스트 (pytest 필요)
+python -m eval.run_eval -v      # rule 모드: 하네스 vs 약한 베이스라인 + ablation (의존성 없음)
+python -m pytest -q tests       # 단위 테스트 (pytest 필요)
 ```
 
-LLM 베이스라인과 Graphiti 베이스라인은 추가 설치가 필요하다. 가상환경 안에 설치한다.
+`llm` 모드와 Graphiti는 가상환경에 패키지를 설치하고 `OPENAI_API_KEY`를 설정해야 한다.
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-python -m eval.run_eval --systems harness,full_context_llm   # ANTHROPIC_API_KEY 필요
-python -m eval.run_eval --systems harness,graphiti           # Neo4j + OPENAI_API_KEY 필요
+python3 -m venv .venv && source .venv/bin/activate   # Windows Git Bash: source .venv/Scripts/activate
+python -m pip install -r requirements.txt
+python -m eval.run_eval --answerer llm --systems retrieval_only,full_context_llm,harness --no-ablation -v
+python -m eval.run_eval --answerer llm --systems retrieval_only,full_context_llm,harness,graphiti --no-ablation -v
 ```
 
-Graphiti는 Neo4j 접속 정보를 환경변수(`NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`)로 받는다.
-본 실험 전에 `python -m scripts.graphiti_smoke`로 연결을 확인한다.
+- 기본 모델은 Graphiti 기본값과 같은 `gpt-6-luna`다. `HARNESS_ANSWER_MODEL`, `HARNESS_SMALL_MODEL`로 바꿀 수 있다.
+- LLM 응답은 `.cache/llm_cache.json`에 캐시되어 다시 돌려도 비용이 들지 않는다.
+- Graphiti는 Neo4j 접속 정보를 환경변수(`NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`)로 받는다. 먼저 `python -m scripts.graphiti_smoke`로 연결을 확인한다.
+- 결과는 `results/<system>[-llm].json`에 질문별로 저장된다.
 
-결과는 `results/<system>.json`에 질문별로 저장된다.
+## 현재 결과
 
-## 현재 결과 (합성 데이터 14문항)
+### rule 모드 (모듈 동작 확인용, 합성 데이터 14문항)
 
-스트롱 베이스라인은 **Graphiti**로 확정했다. 아래 표에는 아직 Graphiti 결과가 없다(실행 전).
+| system | condition_match ↑ | status_acc ↑ | overgeneralization ↓ | irrelevant_used ↓ | false_consensus ↓ | bad_citation_used ↓ | evidence_error ↓ | pii_leak ↓ |
+|---|---|---|---|---|---|---|---|---|
+| retrieval_only | 0.00 | 0.43 | 0.71 | 0.93 | 1.00 | 0.14 | 2.21 | 0.14 |
+| **harness** | 1.00 | 1.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.07 |
+| harness − 조건 비교 | 0.29 | 0.36 | 0.71 | 0.00 | 0.00 | 0.00 | 1.00 | 0.07 |
+| harness − 인용 검증 | 0.93 | 0.93 | 0.00 | 0.00 | 0.00 | 0.07 | 0.07 | 0.07 |
+| harness − 재인용 묶기 | 1.00 | 1.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.21 | 0.07 |
+| harness − 승인 상태 | 0.79 | 0.79 | 0.00 | 0.00 | 0.36 | 0.00 | 0.00 | 0.07 |
+| harness − PII 차단 | 1.00 | 1.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.14 |
 
-| system | condition_match ↑ | status_acc ↑ | overgeneralization ↓ | false_consensus ↓ | bad_citation_used ↓ | evidence_error ↓ | pii_leak ↓ |
-|---|---|---|---|---|---|---|---|
-| retrieval_only (약한 베이스라인) | 0.00 | 0.43 | 0.93 | 1.00 | 0.14 | 2.21 | 0.14 |
-| **harness** | **1.00** | **1.00** | **0.00** | **0.00** | **0.00** | **0.00** | **0.00** |
-| harness − 조건 비교 | 0.29 | 0.36 | 0.71 | 0.00 | 0.00 | 1.00 | 0.00 |
-| harness − 인용 검증 | 0.93 | 0.93 | 0.00 | 0.00 | 0.07 | 0.07 | 0.00 |
-| harness − 재인용 묶기 | 1.00 | 1.00 | 0.00 | 0.00 | 0.00 | 0.21 | 0.00 |
-| harness − 승인 상태 | 0.79 | 0.79 | 0.00 | 0.36 | 0.00 | 0.00 | 0.00 |
-| harness − PII 차단 | 1.00 | 1.00 | 0.00 | 0.00 | 0.00 | 0.00 | 0.14 |
+> **주의.** rule 모드의 하네스는 정답 구조를 받으므로 1.00은 성능 주장이 아니다.
+> 이 표는 각 모듈을 끄면 어느 메트릭이 나빠지는지만 보여준다.
+> rule 모드의 PII 차단은 정규식만 써서 고객 실명은 못 가린다(pii_leak 0.07). llm 모드에서는 작은 모델로 실명도 찾는다.
 
-> **주의.** 이 데이터는 모듈이 제대로 도는지 보려고 직접 만든 시나리오다. 하네스의 규칙이 이 시나리오를 알고 만들어졌으므로 1.00은 성능 주장이 아니다.
-> 이 표가 보여주는 것은 두 가지다. 하나는 각 모듈을 끄면 어느 메트릭이 나빠지는지다.
-> 다른 하나는 메트릭이 실제로 차이를 잡아내는지다.
-> 성능 비교는 Graphiti와 전체 맥락 LLM 베이스라인을 더 크고 현실적인 데이터에 돌려서 해야 한다.
-> 해당 데이터는 [docs/design.md](docs/design.md)의 "평가 데이터 확장"을 참고한다.
+### llm 모드 (공정 비교)
+
+아직 실행 전이다. Graphiti 1차 실행 결과와 거기서 발견한 사례는 [docs/experiments.md](docs/experiments.md)에 있다.
 
 ## 디렉터리
 

@@ -18,22 +18,20 @@ import asyncio
 import os
 from datetime import datetime, timedelta, timezone
 
+from pathlib import Path
+
+from harness.context import answer_with_llm, raw_context
 from harness.schema import ANSWERED, NO_EVIDENCE, Query, Record, Response
+from harness.verifier import SourceStore
 
 KST = timezone(timedelta(hours=9))
-
-
-def record_to_episode(r: Record) -> str:
-    """Graphiti에도 우리 하네스와 같은 정보(작성자, 조건, 승인 상태, 근거)를 텍스트로 준다."""
-    evidence = "; ".join(f"{e.source} rev{e.rev} \"{e.quote}\"" for e in r.evidence)
-    return (f"[{r.id}] 작성자 {r.author}({r.author_type}), 상태 {r.status}. "
-            f"주장: {r.text} 조건: {r.conditions}. 근거: {evidence}")
 
 
 class GraphitiBaseline:
     name = "graphiti"
 
-    def __init__(self, k: int = 5, graphiti=None, group_id: str | None = None):
+    def __init__(self, sources_dir: str | Path, answerer: str = "rule", k: int = 5,
+                 graphiti=None, group_id: str | None = None):
         if graphiti is None:
             from graphiti_core import Graphiti
 
@@ -42,6 +40,8 @@ class GraphitiBaseline:
                                 os.environ.get("NEO4J_PASSWORD", "password"))
         self.g = graphiti
         self.k = k
+        self.answerer = answerer
+        self.sources = SourceStore(sources_dir)
         self.group_id = group_id or f"harness_eval_{datetime.now():%Y%m%d_%H%M%S}"
         self.episode_to_record: dict[str, str] = {}
         self.loop = asyncio.new_event_loop()
@@ -54,8 +54,10 @@ class GraphitiBaseline:
 
         self._run(self.g.build_indices_and_constraints())
         for r in sorted(records, key=lambda r: r.created_at):
+            # 다른 시스템과 같은 원재료: 기록 원본 + 인용한 원문 문서
+            body = "\n".join(raw_context([r], self.sources))
             result = self._run(self.g.add_episode(
-                name=r.id, episode_body=record_to_episode(r), source=EpisodeType.text,
+                name=r.id, episode_body=body, source=EpisodeType.text,
                 source_description="team record", group_id=self.group_id,
                 reference_time=datetime.fromisoformat(r.created_at).replace(tzinfo=KST)))
             self.episode_to_record[result.episode.uuid] = r.id
@@ -65,18 +67,25 @@ class GraphitiBaseline:
         edges = self._run(self.g.search(q.question, group_ids=[self.group_id], num_results=self.k))
         # Graphiti가 무효 처리한 사실(invalid_at / expired_at)은 답에 쓰지 않는다
         valid = [e for e in edges if e.invalid_at is None and e.expired_at is None]
+        if self.answerer == "llm":
+            context = [f"[{','.join(self._record_ids([e])) or '출처 불명'}] {e.fact}" for e in valid]
+            return answer_with_llm(q.question, context)
         if not valid:
             return Response(NO_EVIDENCE, [], [], 0, answer="관련 사실 없음")
-        ids: list[str] = []
-        for e in valid:
-            for ep in e.episodes:
-                rid = self.episode_to_record.get(ep)
-                if rid and rid not in ids:
-                    ids.append(rid)
+        ids = self._record_ids(valid)
         facts = [e.fact for e in valid]
         # Graphiti에는 승인 상태 개념이 없으므로 유효한 사실은 모두 팀 사실로 제시된다.
         # 독립 근거 수는 Graphiti가 돌려준 사실 개수로 센다(재인용을 구분하지 않음).
         return Response(ANSWERED, ids, ids, len(valid), answer=" / ".join(facts), exposed=facts)
+
+    def _record_ids(self, edges) -> list[str]:
+        ids: list[str] = []
+        for e in edges:
+            for ep in e.episodes:
+                rid = self.episode_to_record.get(ep)
+                if rid and rid not in ids:
+                    ids.append(rid)
+        return ids
 
     def invalidated_facts(self) -> list[tuple[str, str]]:
         """Graphiti가 충돌로 보고 무효 처리한 사실. 페인 포인트 1(조건이 다른데 무효화)을 확인하는 데 쓴다."""

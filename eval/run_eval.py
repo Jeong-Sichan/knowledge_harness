@@ -1,9 +1,14 @@
 """베이스라인 대비 하네스 평가.
 
-    python -m eval.run_eval                       # 오프라인: 하네스 + 약한 베이스라인 + ablation
-    python -m eval.run_eval --systems harness,full_context_llm   # API 키 필요
-    python -m eval.run_eval --systems harness,graphiti           # Neo4j + graphiti-core 필요
-    python -m eval.run_eval -v                    # 질문별 답변까지 출력
+두 가지 모드가 있다.
+
+rule 모드 (기본, 오프라인): 하네스는 정답 구조(topic·조건)를 받고 템플릿으로 답한다. 모듈 개발·ablation용.
+    python -m eval.run_eval -v
+
+llm 모드 (공정 비교): 모든 시스템이 자유 텍스트 기록 + 질문 문장만 받고, 같은 LLM 답변기로 답한다.
+하네스도 기록 구조화와 질문 파싱을 LLM으로 직접 한다. OPENAI_API_KEY 필요.
+    python -m eval.run_eval --answerer llm --systems retrieval_only,full_context_llm,harness --no-ablation -v
+    python -m eval.run_eval --answerer llm --systems retrieval_only,full_context_llm,harness,graphiti -v
 """
 from __future__ import annotations
 
@@ -32,28 +37,47 @@ ABLATIONS = {
 }
 
 
-def build(name: str):
+def build(name: str, answerer: str):
+    src = DATA / "sources"
+    structure = "llm" if answerer == "llm" else "gold"
     if name == "harness":
-        return Harness(DATA / "sources")
+        return Harness(src, structure=structure, answerer=answerer)
     if name in ABLATIONS:
-        h = Harness(DATA / "sources", **ABLATIONS[name])
+        h = Harness(src, structure=structure, answerer=answerer, **ABLATIONS[name])
         h.name = name
         return h
     if name == "retrieval_only":
         from baselines.retrieval_only import RetrievalOnly
-        return RetrievalOnly()
+        return RetrievalOnly(src, answerer=answerer)
     if name == "full_context_llm":
+        if answerer != "llm":
+            raise ValueError("full_context_llm은 --answerer llm 에서만 돈다")
         from baselines.full_context_llm import FullContextLLM
-        return FullContextLLM()
+        return FullContextLLM(src)
     if name == "graphiti":
         from baselines.graphiti_baseline import GraphitiBaseline
-        return GraphitiBaseline()
+        return GraphitiBaseline(src, answerer=answerer)
     raise ValueError(f"알 수 없는 시스템: {name}")
+
+
+def report_structuring(name: str, system, gold: dict[str, dict]) -> None:
+    """LLM 구조화가 정답 구조와 얼마나 맞는지. 하네스 오류가 구조화 단계에서 왔는지 가르는 데 쓴다."""
+    recs = system.store.records
+    cond_ok = sum(recs[i].conditions == gold[i]["conditions"] for i in recs)
+    ids = sorted(recs)
+    pairs = [(a, b) for k, a in enumerate(ids) for b in ids[k + 1:]]
+    topic_ok = sum((gold[a]["topic"] == gold[b]["topic"]) == (recs[a].topic == recs[b].topic) for a, b in pairs)
+    print(f"[{name}] 구조화 정확도: 조건 {cond_ok}/{len(ids)}, 주제 묶음(쌍 기준) {topic_ok}/{len(pairs)}")
+    for i in ids:
+        r = recs[i]
+        mark = "" if r.conditions == gold[i]["conditions"] else "  <- 조건 다름(정답 " + str(gold[i]["conditions"]) + ")"
+        print(f"      {i}: topic={r.topic} value={r.value} cond={r.conditions}{mark}")
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--systems", default="retrieval_only,harness")
+    ap.add_argument("--answerer", choices=["rule", "llm"], default="rule")
     ap.add_argument("--no-ablation", action="store_true")
     ap.add_argument("-v", "--verbose", action="store_true")
     ap.add_argument("--out", default=str(ROOT / "results"))
@@ -70,13 +94,18 @@ def main() -> None:
     out_dir = Path(args.out)
     out_dir.mkdir(exist_ok=True)
     table = []
+    llm_mode = args.answerer == "llm"
     for name in names:
-        system = build(name)
+        system = build(name, args.answerer)
         # '_'로 시작하는 정답 라벨은 Record.from_dict가 버린다
         system.ingest([Record.from_dict(r) for r in raw_records])
+        if llm_mode and hasattr(system, "store"):
+            report_structuring(name, system, by_id)
         scores, details = [], []
         for g in gold_queries:
-            resp = system.ask(Query.from_dict(g))
+            # llm 모드에서는 모든 시스템이 질문 문장만 받는다(정답 topic·조건은 채점에만 쓴다)
+            q = Query(g["id"], g["question"]) if llm_mode else Query.from_dict(g)
+            resp = system.ask(q)
             s = score_query(g, resp, by_id)
             scores.append(s)
             details.append({"query": g["id"], "question": g["question"], "expected": g["expected_status"],
@@ -91,7 +120,7 @@ def main() -> None:
                     print(f"      - {n}")
         summary = summarize(scores)
         table.append((name, summary))
-        (out_dir / f"{name}.json").write_text(
+        (out_dir / f"{name}{'-llm' if llm_mode else ''}.json").write_text(
             json.dumps({"summary": summary, "details": details}, ensure_ascii=False, indent=2), encoding="utf-8")
         if hasattr(system, "verifier"):
             print(f"[{name}] 인용 검증 캐시: {system.verifier.stats}")
@@ -105,7 +134,11 @@ def main() -> None:
         if hasattr(system, "close"):
             system.close()
 
-    cols = ["condition_match", "status_acc", "overgeneralization", "false_consensus",
+    if llm_mode:
+        from harness import llm
+        print(f"\nLLM 호출 {llm.stats['calls']}회, 캐시 재사용 {llm.stats['cache_hits']}회 "
+              f"(답변 모델 {llm.ANSWER_MODEL}, 앞단 모델 {llm.SMALL_MODEL})")
+    cols = ["condition_match", "status_acc", "overgeneralization", "irrelevant_used", "false_consensus",
             "bad_citation_used", "evidence_error", "pii_leak"]
     print("\n| system | " + " | ".join(cols) + " |")
     print("|---|" + "---|" * len(cols))

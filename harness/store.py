@@ -1,7 +1,9 @@
-"""팀 기록 저장소. 기록을 넣을 때 인용 검증 → PII 차단 → 관계 판정을 거친다."""
+"""팀 기록 저장소. 기록을 넣을 때 인용 검증 → PII 차단 → (구조화) → 관계 판정을 거친다."""
 from __future__ import annotations
 
 from . import relation
+from typing import Callable
+
 from .pii import PIIGuard
 from .schema import Evidence, Record
 from .verifier import CitationVerifier
@@ -9,9 +11,11 @@ from .verifier import CitationVerifier
 
 class RecordStore:
     def __init__(self, verifier: CitationVerifier, judge_relations: bool = True,
-                 pii_guard: PIIGuard | None = None):
+                 pii_guard: PIIGuard | None = None,
+                 structurer: Callable[[Record], None] | None = None):
         self.verifier = verifier
         self.pii_guard = pii_guard
+        self.structurer = structurer  # 자유 텍스트 기록 → topic·value·conditions (LLM 모드)
         self.judge_relations = judge_relations
         self.records: dict[str, Record] = {}
         self.version = 0  # 기록이 바뀔 때마다 증가. 답변 캐시 무효화에 쓴다.
@@ -21,6 +25,8 @@ class RecordStore:
         rec.citation_valid = all(self.verifier.verify(e) for e in rec.evidence) if rec.evidence else False
         if self.pii_guard is not None:
             self._mask(rec)
+        if self.structurer is not None:
+            self.structurer(rec)  # 가린 사본으로 구조화하므로 민감 정보가 외부 LLM에 가지 않는다
         primary = relation.NONE
         if self.judge_relations:
             primary, links = relation.judge(rec, list(self.records.values()))

@@ -44,6 +44,7 @@ class Record:
     citation_valid: bool | None = None
     relations: list[tuple[str, str]] = field(default_factory=list)  # (상대 기록 id, 관계)
     needs_review: bool = False
+    pii_types: list[str] = field(default_factory=list)  # 가린 민감 정보 종류
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Record":
@@ -83,3 +84,4 @@ class Response:
     independent_evidence: int   # 답변이 주장하는 독립 근거 수
     answer: str = ""
     notes: list[str] = field(default_factory=list)  # 조건 차이, 충돌, 인용 오류 등 안내
+    exposed: list[str] = field(default_factory=list)  # 사용자(와 그의 AI)에게 넘어가는 근거 원문

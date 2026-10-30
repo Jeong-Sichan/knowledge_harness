@@ -59,3 +59,106 @@ def test_answer_cache_invalidated_by_new_record():
                             "evidence": [{"source": "exp_002", "rev": 1, "quote": "XGBoost AUC 0.846"}]})
     h.store.add(new)
     assert h.ask(q).status == S_CONFLICT
+
+
+def test_pii_masked_before_sharing():
+    h = load()
+    r14, r15 = h.store.records["R14"], h.store.records["R15"]
+    assert "010-2345-6789" not in r14.text and "minsu.kim@example.com" not in r14.text
+    assert "sk-live-" not in r15.text
+    assert r14.citation_valid  # 인용 검증은 가리기 전 원문 기준
+    assert set(r14.pii_types) == {"email", "phone"} and r15.pii_types == ["api_key"]
+
+
+def test_pii_guard_ignores_normal_numbers():
+    from harness.pii import PIIGuard
+    text, kinds = PIIGuard().mask("XGBoost AUC 0.842, learning_rate 0.05, 피처 12개")
+    assert kinds == [] and "0.842" in text
+
+
+def test_graphiti_adapter_maps_episodes_to_records():
+    """Neo4j 없이 가짜 Graphiti 객체로 어댑터의 매핑 로직만 확인한다."""
+    import pytest
+    pytest.importorskip("graphiti_core")
+    from types import SimpleNamespace as NS
+    from baselines.graphiti_baseline import GraphitiBaseline
+
+    class FakeGraphiti:
+        def __init__(self):
+            self.n = 0
+        async def build_indices_and_constraints(self): pass
+        async def add_episode(self, **kw):
+            self.n += 1
+            return NS(episode=NS(uuid=f"ep{self.n}"), edges=[])
+        async def search(self, query, group_ids=None, num_results=10):
+            return [NS(fact="XGBoost가 가장 좋다", episodes=["ep1", "ep2"], invalid_at=None, expired_at=None),
+                    NS(fact="LightGBM이 더 좋다", episodes=["ep3"], invalid_at="2026-09-29", expired_at=None)]
+        async def close(self): pass
+
+    recs = [Record.from_dict(r) for r in json.loads((DATA / "records.json").read_text(encoding="utf-8"))][:3]
+    gb = GraphitiBaseline(DATA / "sources", graphiti=FakeGraphiti(), group_id="t")
+    gb.ingest(recs)
+    resp = gb.ask(Query("x", "모델?"))
+    assert resp.supporting_ids == ["R01", "R02"]   # 무효 처리된 사실은 제외
+    assert resp.team_fact_ids == resp.supporting_ids
+    gb.close()
+
+
+def test_llm_mode_plumbing_without_api(monkeypatch):
+    """API 키 없이 가짜 LLM으로 공정 비교 모드의 배선만 확인한다."""
+    import pytest
+    pytest.importorskip("pydantic")
+    from harness import llm
+    from baselines.full_context_llm import FullContextLLM
+    from baselines.retrieval_only import RetrievalOnly
+
+    seen_prompts = []
+
+    def fake_structure(text, source, known):
+        seen_prompts.append(text + source)
+        return "best_model", "XGBoost", {"n_features": 12, "dataset": "v1"}
+
+    def fake_answer(question, context):
+        seen_prompts.append("\n".join(context))
+        return llm.LLMAnswer(status="answered", supporting_ids=["R01"], team_fact_ids=["R01"],
+                             independent_evidence=1, answer="XGBoost")
+
+    monkeypatch.setattr(llm, "structure_record", fake_structure)
+    monkeypatch.setattr(llm, "parse_query", lambda q, topics: ("best_model", {"n_features": 12, "dataset": "v1"}))
+    monkeypatch.setattr(llm, "answer", fake_answer)
+    monkeypatch.setattr(llm, "detect_pii_spans", lambda text: ["김민수"] if "김민수" in text else [])
+
+    raw = json.loads((DATA / "records.json").read_text(encoding="utf-8"))
+    h = Harness(DATA / "sources", structure="llm", answerer="llm")
+    h.ingest([Record.from_dict(r) for r in raw])
+    resp = h.ask(Query("x", "피처 12개 v1 모델?"))
+    assert resp.status == "answered" and any("[하네스 판정]" in c for c in resp.exposed)
+    # 구조화·답변 프롬프트로 나간 텍스트에 민감 정보가 없어야 한다(가린 사본만 외부 LLM으로)
+    assert not any(s in p for p in seen_prompts for s in ("010-2345-6789", "minsu.kim@example.com", "김민수"))
+
+    for system in (FullContextLLM(DATA / "sources"), RetrievalOnly(DATA / "sources", answerer="llm")):
+        system.ingest([Record.from_dict(r) for r in raw])
+        resp = system.ask(Query("x", "피처 12개, 데이터 v1에서 이탈 예측 모델은 뭐가 좋아?"))
+        assert any(c.startswith("<source") for c in resp.exposed)  # 원문도 같이 넘어간다
+        assert not any("conditions" in c or "n_features" in c for c in resp.exposed[:1])  # 정답 조건 필드는 안 넘김
+
+
+def test_scale_distractors_keep_gold_valid():
+    """방해 기록은 어떤 정답 질문의 조건과도 맞지 않고, 인용은 원문과 맞아야 한다."""
+    from eval.scale import make_distractors
+    from harness.conditions import is_compatible
+    from harness.verifier import CitationVerifier, SourceStore
+    from harness.schema import Evidence
+    import tempfile
+
+    recs, sources = make_distractors(200)
+    queries = json.loads((DATA / "queries.json").read_text(encoding="utf-8"))
+    for r in recs:
+        for q in queries:
+            if r["topic"] == q["topic"]:
+                assert not is_compatible(q["conditions"], r["conditions"]), (r["id"], q["id"])
+    with tempfile.TemporaryDirectory() as d:
+        for sid, text in sources.items():
+            Path(d, f"{sid}.md").write_text(text, encoding="utf-8")
+        v = CitationVerifier(SourceStore(d))
+        assert all(v.verify(Evidence(**r["evidence"][0])) for r in recs)

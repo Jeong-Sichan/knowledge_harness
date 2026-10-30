@@ -12,6 +12,9 @@ from .schema import (ANSWERED, APPROVED, CONFLICT, NO_EVIDENCE, ONLY_UNAPPROVED,
                      Query, Record, Response)
 
 
+MAX_NEARBY_NOTES = 3
+
+
 @dataclass
 class ComposerConfig:
     """모듈별 기여를 보는 ablation 스위치."""
@@ -39,10 +42,14 @@ def compose(q: Query, candidates: list[Record], cfg: ComposerConfig = ComposerCo
         applicable = compatible
 
     if not applicable:
-        for r in nearby:
+        # 조건이 가장 가까운 기록 몇 건만 안내한다. 전부 나열하면 맥락이 기록 수에 비례해 커진다.
+        nearby = sorted(nearby, key=lambda r: len(mismatched_keys(q.conditions, r.conditions)))
+        for r in nearby[:MAX_NEARBY_NOTES]:
             keys = mismatched_keys(q.conditions, r.conditions)
             notes.append(f"{r.id}({r.value})는 조건이 다름: " + ", ".join(
                 f"{k} 질문={q.conditions[k]} / 기록={r.conditions[k]}" for k in keys))
+        if len(nearby) > MAX_NEARBY_NOTES:
+            notes.append(f"그 외 조건이 다른 기록 {len(nearby) - MAX_NEARBY_NOTES}건")
         return Response(
             status=NO_EVIDENCE, supporting_ids=[], team_fact_ids=[], independent_evidence=0,
             answer=f"[{describe(q.conditions)}] 조건에 맞는 팀 근거가 없습니다."
@@ -76,6 +83,11 @@ def compose(q: Query, candidates: list[Record], cfg: ComposerConfig = ComposerCo
         if dup > 0:
             notes.append(f"재인용 {dup}건은 같은 근거로 묶음")
 
+    for r in applicable:
+        if r.pii_types:
+            notes.append(f"{r.id}: 민감 정보({', '.join(r.pii_types)})를 가리고 공유")
+
     return Response(status=status, supporting_ids=[r.id for r in applicable],
                     team_fact_ids=[r.id for r in approved], independent_evidence=independent,
-                    answer=f"[{describe(q.conditions)}] {text}", notes=notes)
+                    answer=f"[{describe(q.conditions)}] {text}", notes=notes,
+                    exposed=[r.text for r in applicable])

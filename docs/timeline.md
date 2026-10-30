@@ -5,13 +5,18 @@
 | 할 일 | 담당 | 상태 |
 |---|---|---|
 | 모듈 구성 확정 (README 모듈 표, docs/design.md) | 공동 | 초안 완료, 팀 리뷰 필요 |
-| 스트롱 베이스라인 Graphiti 확정, 페인 포인트 정리 | 공동 | 초안 완료 |
-| Graphiti 설치 후 어댑터 실제 실행 (Neo4j) | | 미착수 |
-| full_context_llm 베이스라인 실행 (API 키) | | 미착수 |
-| 메트릭 확정 (condition_match + 보조 4개) | 공동 | 초안 완료 |
+| 스트롱 베이스라인 Graphiti 확정, 페인 포인트 정리 | 공동 | **확정** |
+| PII 차단 모듈 (규칙 기반) + pii_leak 메트릭 | | 완료. 이름 탐지(작은 모델) 연결은 미착수 |
+| Graphiti 설치 후 어댑터 실제 실행 (Neo4j) | | 1차 완료 ([experiments.md](experiments.md)) |
+| 공정 비교 실험 (`--answerer llm`, OpenAI) | | 2차 완료 ([experiments.md](experiments.md)) |
+| 규모 실험 (`--scale 100/300`) | | 완료 |
+| 발표 흐름 정리 | | 초안 ([meeting2.md](meeting2.md)) |
+| Graphiti 규모 실험 (`--scale 100`) | | 완료 (0.36) |
+| full_context_llm 베이스라인 실행 | | 공정 비교 실험에 포함 |
+| 메트릭 확정 (condition_match + 보조 6개) | 공동 | 초안 완료 |
 | 핵심 모듈 데모 (`python -m eval.run_eval -v`) | 공동 | 동작함 |
-| 베이스라인 논문/코드 링크 멘토에게 공유 | | 미착수 |
-| 열린 질문 정리 (승인 절차, 조건 키, PII 범위) | 공동 | 미착수 |
+| 베이스라인 논문/코드 링크 멘토에게 공유 | | 완료 |
+| 열린 질문 정리 (승인 절차, 조건 키) | 공동 | 미착수 |
 
 ## 학기 남은 기간 (초안, 팀이 날짜 조정)
 

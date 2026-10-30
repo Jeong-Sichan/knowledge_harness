@@ -9,6 +9,9 @@ llm 모드 (공정 비교): 모든 시스템이 자유 텍스트 기록 + 질문
 하네스도 기록 구조화와 질문 파싱을 LLM으로 직접 한다. OPENAI_API_KEY 필요.
     python -m eval.run_eval --answerer llm --systems retrieval_only,full_context_llm,harness --no-ablation -v
     python -m eval.run_eval --answerer llm --systems retrieval_only,full_context_llm,harness,graphiti -v
+
+규모 실험: --scale N 이면 조건만 다른 방해 기록 N개를 섞는다(eval/scale.py). 정답 라벨은 그대로 유효하다.
+    python -m eval.run_eval --scale 300 --no-ablation
 """
 from __future__ import annotations
 
@@ -37,8 +40,7 @@ ABLATIONS = {
 }
 
 
-def build(name: str, answerer: str):
-    src = DATA / "sources"
+def build(name: str, answerer: str, src: Path = DATA / "sources"):
     structure = "llm" if answerer == "llm" else "gold"
     if name == "harness":
         return Harness(src, structure=structure, answerer=answerer)
@@ -78,12 +80,20 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--systems", default="retrieval_only,harness")
     ap.add_argument("--answerer", choices=["rule", "llm"], default="rule")
+    ap.add_argument("--scale", type=int, default=0, help="섞을 방해 기록 수")
+    ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--no-ablation", action="store_true")
     ap.add_argument("-v", "--verbose", action="store_true")
     ap.add_argument("--out", default=str(ROOT / "results"))
     args = ap.parse_args()
 
-    raw_records = json.loads((DATA / "records.json").read_text(encoding="utf-8"))
+    src = DATA / "sources"
+    if args.scale:
+        from .scale import build_scaled_dataset
+        raw_records, src = build_scaled_dataset(args.scale, args.seed)
+        print(f"규모 실험: 기록 {len(raw_records)}개 (방해 기록 {args.scale}개, seed {args.seed})")
+    else:
+        raw_records = json.loads((DATA / "records.json").read_text(encoding="utf-8"))
     gold_queries = json.loads((DATA / "queries.json").read_text(encoding="utf-8"))
     by_id = {r["id"]: r for r in raw_records}
 
@@ -96,7 +106,7 @@ def main() -> None:
     table = []
     llm_mode = args.answerer == "llm"
     for name in names:
-        system = build(name, args.answerer)
+        system = build(name, args.answerer, src)
         # '_'로 시작하는 정답 라벨은 Record.from_dict가 버린다
         system.ingest([Record.from_dict(r) for r in raw_records])
         if llm_mode and hasattr(system, "store"):
@@ -120,7 +130,8 @@ def main() -> None:
                     print(f"      - {n}")
         summary = summarize(scores)
         table.append((name, summary))
-        (out_dir / f"{name}{'-llm' if llm_mode else ''}.json").write_text(
+        suffix = ("-llm" if llm_mode else "") + (f"-scale{args.scale}" if args.scale else "")
+        (out_dir / f"{name}{suffix}.json").write_text(
             json.dumps({"summary": summary, "details": details}, ensure_ascii=False, indent=2), encoding="utf-8")
         if hasattr(system, "verifier"):
             print(f"[{name}] 인용 검증 캐시: {system.verifier.stats}")
@@ -139,11 +150,12 @@ def main() -> None:
         print(f"\nLLM 호출 {llm.stats['calls']}회, 캐시 재사용 {llm.stats['cache_hits']}회 "
               f"(답변 모델 {llm.ANSWER_MODEL}, 앞단 모델 {llm.SMALL_MODEL})")
     cols = ["condition_match", "status_acc", "overgeneralization", "irrelevant_used", "false_consensus",
-            "bad_citation_used", "evidence_error", "pii_leak"]
+            "bad_citation_used", "evidence_error", "pii_in_context", "pii_in_answer", "context_chars"]
     print("\n| system | " + " | ".join(cols) + " |")
     print("|---|" + "---|" * len(cols))
     for name, s in table:
-        print(f"| {name} | " + " | ".join(f"{s[c]:.2f}" for c in cols) + " |")
+        print(f"| {name} | " + " | ".join(f"{s[c]:.0f}" if c == "context_chars" else f"{s[c]:.2f}"
+                                          for c in cols) + " |")
     print("\n(condition_match·status_acc는 높을수록, 나머지는 낮을수록 좋음)")
 
 

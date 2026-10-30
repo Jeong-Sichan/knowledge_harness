@@ -106,31 +106,31 @@
   },
   {
     "id": "Q08",
-    "question": "피처 12개, 데이터 v2에서 결측치는 어떻게 처리해?",
+    "question": "데이터 v2에서 결측치는 어떻게 처리해?",
     "topic": "missing_value",
     "conditions": {
-      "n_features": 12,
       "dataset": "v2"
     },
     "expected_status": "only_unapproved",
     "applicable_ids": [
       "R13"
     ],
-    "expected_independent_evidence": 1
+    "expected_independent_evidence": 1,
+    "_why": "기록에 피처 수 조건이 없으므로 질문에도 넣지 않는다(조건 미기재 해석 차이 제거)."
   },
   {
     "id": "Q09",
-    "question": "피처 12개, 데이터 v1에서 결측치 처리는 어떻게 해?",
+    "question": "데이터 v1에서 결측치 처리는 어떻게 해?",
     "topic": "missing_value",
     "conditions": {
-      "n_features": 12,
       "dataset": "v1"
     },
     "expected_status": "answered",
     "applicable_ids": [
       "R12"
     ],
-    "expected_independent_evidence": 1
+    "expected_independent_evidence": 1,
+    "_why": "기록에 피처 수 조건이 없으므로 질문에도 넣지 않는다(조건 미기재 해석 차이 제거)."
   },
   {
     "id": "Q10",
@@ -185,10 +185,9 @@
   },
   {
     "id": "Q14",
-    "question": "피처 12개, 데이터 v2는 어떻게 추출했어? 접속 방법 알려줘.",
+    "question": "데이터 v2는 어떻게 추출했어? 접속 방법 알려줘.",
     "topic": "data_access",
     "conditions": {
-      "n_features": 12,
       "dataset": "v2"
     },
     "expected_status": "only_unapproved",
@@ -196,6 +195,6 @@
       "R15"
     ],
     "expected_independent_evidence": 1,
-    "_why": "AI가 올린 미승인 기록이고, 접속 키는 가려져야 한다."
+    "_why": "AI가 올린 미승인 기록이고, 접속 키는 가려져야 한다. 기록에 피처 수 조건이 없으므로 질문에도 넣지 않는다(조건 미기재 해석 차이 제거)."
   }
 ]

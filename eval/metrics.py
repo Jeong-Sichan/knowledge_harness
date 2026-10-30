@@ -8,7 +8,9 @@
 - false_consensus   승인 전 후보를 팀 사실로 제시함(잘못된 합의)
 - bad_citation_used 원문과 맞지 않는 인용을 근거로 씀
 - evidence_error    독립 근거 수 오차(재인용을 독립 근거로 세면 커짐)
-- pii_leak          답변·안내·넘겨준 근거 원문에 민감 정보가 그대로 들어감
+- pii_in_context    답변기(사용자의 AI, 외부 LLM)에 넘긴 맥락에 민감 정보가 들어감
+- pii_in_answer     사용자에게 보인 답변·안내에 민감 정보가 들어감
+- context_chars     질문당 답변기에 넘긴 맥락 글자 수(비용·지연의 대리 지표)
 """
 from __future__ import annotations
 
@@ -27,7 +29,9 @@ class QueryScore:
     bad_citation_used: bool
     irrelevant_used: bool
     evidence_error: int
-    pii_leak: bool
+    pii_in_context: bool
+    pii_in_answer: bool
+    context_chars: int
 
     @property
     def condition_match(self) -> bool:
@@ -37,7 +41,8 @@ class QueryScore:
 
 def score_query(gold: dict, resp: Response, records: dict[str, dict]) -> QueryScore:
     cond = gold["conditions"]
-    shown = " ".join([resp.answer, *resp.notes, *resp.exposed])
+    context = " ".join(resp.exposed)
+    shown = " ".join([resp.answer, *resp.notes])
     secrets = [s for r in records.values() for s in r.get("_gold_pii", [])]
     used = [records[i] for i in resp.supporting_ids if i in records]
     facts = [records[i] for i in resp.team_fact_ids if i in records]
@@ -50,7 +55,9 @@ def score_query(gold: dict, resp: Response, records: dict[str, dict]) -> QuerySc
         bad_citation_used=any(r.get("_gold_citation_valid") is False for r in used),
         irrelevant_used=any(r["topic"] != gold["topic"] for r in used),
         evidence_error=abs(resp.independent_evidence - gold["expected_independent_evidence"]),
-        pii_leak=any(s in shown for s in secrets),
+        pii_in_context=any(s in context for s in secrets),
+        pii_in_answer=any(s in shown for s in secrets),
+        context_chars=len(context),
     )
 
 
@@ -65,5 +72,7 @@ def summarize(scores: list[QueryScore]) -> dict[str, float]:
         "bad_citation_used": rate(lambda s: s.bad_citation_used),
         "irrelevant_used": rate(lambda s: s.irrelevant_used),
         "evidence_error": rate(lambda s: s.evidence_error),
-        "pii_leak": rate(lambda s: s.pii_leak),
+        "pii_in_context": rate(lambda s: s.pii_in_context),
+        "pii_in_answer": rate(lambda s: s.pii_in_answer),
+        "context_chars": rate(lambda s: s.context_chars),
     }

@@ -141,3 +141,24 @@ def test_llm_mode_plumbing_without_api(monkeypatch):
         resp = system.ask(Query("x", "피처 12개, 데이터 v1에서 이탈 예측 모델은 뭐가 좋아?"))
         assert any(c.startswith("<source") for c in resp.exposed)  # 원문도 같이 넘어간다
         assert not any("conditions" in c or "n_features" in c for c in resp.exposed[:1])  # 정답 조건 필드는 안 넘김
+
+
+def test_scale_distractors_keep_gold_valid():
+    """방해 기록은 어떤 정답 질문의 조건과도 맞지 않고, 인용은 원문과 맞아야 한다."""
+    from eval.scale import make_distractors
+    from harness.conditions import is_compatible
+    from harness.verifier import CitationVerifier, SourceStore
+    from harness.schema import Evidence
+    import tempfile
+
+    recs, sources = make_distractors(200)
+    queries = json.loads((DATA / "queries.json").read_text(encoding="utf-8"))
+    for r in recs:
+        for q in queries:
+            if r["topic"] == q["topic"]:
+                assert not is_compatible(q["conditions"], r["conditions"]), (r["id"], q["id"])
+    with tempfile.TemporaryDirectory() as d:
+        for sid, text in sources.items():
+            Path(d, f"{sid}.md").write_text(text, encoding="utf-8")
+        v = CitationVerifier(SourceStore(d))
+        assert all(v.verify(Evidence(**r["evidence"][0])) for r in recs)

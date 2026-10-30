@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 from datetime import datetime, timedelta, timezone
 
 from pathlib import Path
@@ -53,15 +54,29 @@ class GraphitiBaseline:
         from graphiti_core.nodes import EpisodeType
 
         self._run(self.g.build_indices_and_constraints())
-        for r in sorted(records, key=lambda r: r.created_at):
+        ordered = sorted(records, key=lambda r: r.created_at)
+        start = time.time()
+        for i, r in enumerate(ordered, 1):
             # 다른 시스템과 같은 원재료: 기록 원본 + 인용한 원문 문서
             body = "\n".join(raw_context([r], self.sources))
-            result = self._run(self.g.add_episode(
-                name=r.id, episode_body=body, source=EpisodeType.text,
-                source_description="team record", group_id=self.group_id,
-                reference_time=datetime.fromisoformat(r.created_at).replace(tzinfo=KST)))
+            for attempt in range(4):
+                try:
+                    result = self._run(self.g.add_episode(
+                        name=r.id, episode_body=body, source=EpisodeType.text,
+                        source_description="team record", group_id=self.group_id,
+                        reference_time=datetime.fromisoformat(r.created_at).replace(tzinfo=KST)))
+                    break
+                except Exception as e:  # 속도 제한 등 일시 오류는 기다렸다가 다시 시도
+                    if attempt == 3:
+                        raise
+                    wait = 10 * 2 ** attempt
+                    print(f"  [graphiti] {r.id} 실패({type(e).__name__}), {wait}초 후 재시도", flush=True)
+                    time.sleep(wait)
             self.episode_to_record[result.episode.uuid] = r.id
-            print(f"  [graphiti] {r.id} 입력: 사실 {len(result.edges)}개 추출")
+            elapsed = time.time() - start
+            eta = elapsed / i * (len(ordered) - i)
+            print(f"  [graphiti] {i}/{len(ordered)} {r.id}: 사실 {len(result.edges)}개 "
+                  f"(경과 {elapsed / 60:.1f}분, 남은 예상 {eta / 60:.1f}분)", flush=True)
 
     def ask(self, q: Query) -> Response:
         edges = self._run(self.g.search(q.question, group_ids=[self.group_id], num_results=self.k))

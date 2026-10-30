@@ -10,6 +10,7 @@
 | Graphiti 설치 후 어댑터 실제 실행 (Neo4j) | | 1차 완료 ([experiments.md](experiments.md)) |
 | 공정 비교 실험 (`--answerer llm`, OpenAI) | | 2차 완료 ([experiments.md](experiments.md)) |
 | 규모 실험 (`--scale 100/300`) | | 100 완료, 기본·300 결과 필요 |
+| Graphiti 규모 실험 (`--scale 100`) | | 실행 필요 |
 | full_context_llm 베이스라인 실행 | | 공정 비교 실험에 포함 |
 | 메트릭 확정 (condition_match + 보조 6개) | 공동 | 초안 완료 |
 | 핵심 모듈 데모 (`python -m eval.run_eval -v`) | 공동 | 동작함 |

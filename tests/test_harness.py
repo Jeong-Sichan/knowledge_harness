@@ -59,3 +59,18 @@ def test_answer_cache_invalidated_by_new_record():
                             "evidence": [{"source": "exp_002", "rev": 1, "quote": "XGBoost AUC 0.846"}]})
     h.store.add(new)
     assert h.ask(q).status == S_CONFLICT
+
+
+def test_pii_masked_before_sharing():
+    h = load()
+    r14, r15 = h.store.records["R14"], h.store.records["R15"]
+    assert "010-2345-6789" not in r14.text and "minsu.kim@example.com" not in r14.text
+    assert "sk-live-" not in r15.text
+    assert r14.citation_valid  # 인용 검증은 가리기 전 원문 기준
+    assert set(r14.pii_types) == {"email", "phone"} and r15.pii_types == ["api_key"]
+
+
+def test_pii_guard_ignores_normal_numbers():
+    from harness.pii import PIIGuard
+    text, kinds = PIIGuard().mask("XGBoost AUC 0.842, learning_rate 0.05, 피처 12개")
+    assert kinds == [] and "0.842" in text

@@ -76,6 +76,11 @@ def compose(q: Query, candidates: list[Record], cfg: ComposerConfig = ComposerCo
         if dup > 0:
             notes.append(f"재인용 {dup}건은 같은 근거로 묶음")
 
+    for r in applicable:
+        if r.pii_types:
+            notes.append(f"{r.id}: 민감 정보({', '.join(r.pii_types)})를 가리고 공유")
+
     return Response(status=status, supporting_ids=[r.id for r in applicable],
                     team_fact_ids=[r.id for r in approved], independent_evidence=independent,
-                    answer=f"[{describe(q.conditions)}] {text}", notes=notes)
+                    answer=f"[{describe(q.conditions)}] {text}", notes=notes,
+                    exposed=[r.text for r in applicable])

@@ -1,108 +1,325 @@
 [
   {
-    "id": "R01", "created_at": "2026-09-20T10:00", "author": "정시찬", "author_type": "human",
+    "id": "R01",
+    "created_at": "2026-09-20T10:00",
+    "author": "정시찬",
+    "author_type": "human",
     "text": "이탈 예측 모델은 XGBoost가 가장 좋다.",
-    "topic": "best_model", "value": "XGBoost",
-    "conditions": {"n_features": 12, "dataset": "v1"},
-    "evidence": [{"source": "exp_001", "rev": 1, "quote": "XGBoost AUC 0.842"}],
+    "topic": "best_model",
+    "value": "XGBoost",
+    "conditions": {
+      "n_features": 12,
+      "dataset": "v1"
+    },
+    "evidence": [
+      {
+        "source": "exp_001",
+        "rev": 1,
+        "quote": "XGBoost AUC 0.842"
+      }
+    ],
     "status": "approved"
   },
   {
-    "id": "R02", "created_at": "2026-09-21T09:00", "author": "박재원의 AI", "author_type": "ai",
+    "id": "R02",
+    "created_at": "2026-09-21T09:00",
+    "author": "박재원의 AI",
+    "author_type": "ai",
     "text": "팀 실험 결과 XGBoost가 최고 모델로 확인됨.",
-    "topic": "best_model", "value": "XGBoost",
-    "conditions": {"n_features": 12, "dataset": "v1"},
-    "evidence": [{"source": "exp_001", "rev": 1, "quote": "XGBoost AUC 0.842"}],
+    "topic": "best_model",
+    "value": "XGBoost",
+    "conditions": {
+      "n_features": 12,
+      "dataset": "v1"
+    },
+    "evidence": [
+      {
+        "source": "exp_001",
+        "rev": 1,
+        "quote": "XGBoost AUC 0.842"
+      }
+    ],
     "status": "candidate"
   },
   {
-    "id": "R03", "created_at": "2026-09-27T15:00", "author": "박재원", "author_type": "human",
+    "id": "R03",
+    "created_at": "2026-09-27T15:00",
+    "author": "박재원",
+    "author_type": "human",
     "text": "데이터 v2에서는 LightGBM이 XGBoost보다 낫다.",
-    "topic": "best_model", "value": "LightGBM",
-    "conditions": {"n_features": 12, "dataset": "v2"},
-    "evidence": [{"source": "exp_002", "rev": 1, "quote": "LightGBM AUC 0.851"}],
+    "topic": "best_model",
+    "value": "LightGBM",
+    "conditions": {
+      "n_features": 12,
+      "dataset": "v2"
+    },
+    "evidence": [
+      {
+        "source": "exp_002",
+        "rev": 1,
+        "quote": "LightGBM AUC 0.851"
+      }
+    ],
     "status": "approved"
   },
   {
-    "id": "R04", "created_at": "2026-09-29T11:00", "author": "정시찬의 AI", "author_type": "ai",
+    "id": "R04",
+    "created_at": "2026-09-29T11:00",
+    "author": "정시찬의 AI",
+    "author_type": "ai",
     "text": "시드를 바꿔 재실험하니 v1에서도 LightGBM이 더 좋았다.",
-    "topic": "best_model", "value": "LightGBM",
-    "conditions": {"n_features": 12, "dataset": "v1"},
-    "evidence": [{"source": "exp_003", "rev": 1, "quote": "LightGBM AUC 0.848"}],
+    "topic": "best_model",
+    "value": "LightGBM",
+    "conditions": {
+      "n_features": 12,
+      "dataset": "v1"
+    },
+    "evidence": [
+      {
+        "source": "exp_003",
+        "rev": 1,
+        "quote": "LightGBM AUC 0.848"
+      }
+    ],
     "status": "candidate"
   },
   {
-    "id": "R05", "created_at": "2026-09-22T14:00", "author": "박재원", "author_type": "human",
+    "id": "R05",
+    "created_at": "2026-09-22T14:00",
+    "author": "박재원",
+    "author_type": "human",
     "text": "클래스 불균형은 SMOTE보다 class_weight로 처리하는 게 낫다.",
-    "topic": "imbalance_method", "value": "class_weight",
-    "conditions": {"n_features": 12, "dataset": "v1"},
-    "evidence": [{"source": "exp_004", "rev": 1, "quote": "class_weight 적용이 SMOTE보다 F1이 0.03 높았다"}],
+    "topic": "imbalance_method",
+    "value": "class_weight",
+    "conditions": {
+      "n_features": 12,
+      "dataset": "v1"
+    },
+    "evidence": [
+      {
+        "source": "exp_004",
+        "rev": 1,
+        "quote": "class_weight 적용이 SMOTE보다 F1이 0.03 높았다"
+      }
+    ],
     "status": "approved"
   },
   {
-    "id": "R06", "created_at": "2026-10-01T10:00", "author": "박재원의 AI", "author_type": "ai",
+    "id": "R06",
+    "created_at": "2026-10-01T10:00",
+    "author": "박재원의 AI",
+    "author_type": "ai",
     "text": "v2 데이터에서는 클래스 불균형 처리에 SMOTE가 유리하다.",
-    "topic": "imbalance_method", "value": "SMOTE",
-    "conditions": {"n_features": 12, "dataset": "v2"},
-    "evidence": [{"source": "exp_005", "rev": 1, "quote": "데이터 v2에서는 SMOTE가 class_weight보다 F1이 0.01 높았다"}],
+    "topic": "imbalance_method",
+    "value": "SMOTE",
+    "conditions": {
+      "n_features": 12,
+      "dataset": "v2"
+    },
+    "evidence": [
+      {
+        "source": "exp_005",
+        "rev": 1,
+        "quote": "데이터 v2에서는 SMOTE가 class_weight보다 F1이 0.01 높았다"
+      }
+    ],
     "status": "candidate"
   },
   {
-    "id": "R07", "created_at": "2026-09-20T11:00", "author": "정시찬", "author_type": "human",
+    "id": "R07",
+    "created_at": "2026-09-20T11:00",
+    "author": "정시찬",
+    "author_type": "human",
     "text": "XGBoost learning rate는 0.05가 최적이다.",
-    "topic": "xgb_learning_rate", "value": "0.05",
-    "conditions": {"n_features": 12, "dataset": "v1"},
-    "evidence": [{"source": "exp_001", "rev": 1, "quote": "learning_rate 0.05에서 최고 성능"}],
+    "topic": "xgb_learning_rate",
+    "value": "0.05",
+    "conditions": {
+      "n_features": 12,
+      "dataset": "v1"
+    },
+    "evidence": [
+      {
+        "source": "exp_001",
+        "rev": 1,
+        "quote": "learning_rate 0.05에서 최고 성능"
+      }
+    ],
     "status": "approved"
   },
   {
-    "id": "R08", "created_at": "2026-10-03T16:00", "author": "박재원의 AI", "author_type": "ai",
+    "id": "R08",
+    "created_at": "2026-10-03T16:00",
+    "author": "박재원의 AI",
+    "author_type": "ai",
     "text": "XGBoost learning rate는 0.1이 가장 좋았다고 기록되어 있다.",
-    "topic": "xgb_learning_rate", "value": "0.1",
-    "conditions": {"n_features": 12, "dataset": "v1"},
-    "evidence": [{"source": "exp_001", "rev": 1, "quote": "learning_rate 0.1에서 최고 성능"}],
+    "topic": "xgb_learning_rate",
+    "value": "0.1",
+    "conditions": {
+      "n_features": 12,
+      "dataset": "v1"
+    },
+    "evidence": [
+      {
+        "source": "exp_001",
+        "rev": 1,
+        "quote": "learning_rate 0.1에서 최고 성능"
+      }
+    ],
     "status": "candidate",
     "_gold_citation_valid": false,
     "_note": "인용 오류(원문에 없는 문장). 인용 검증 모듈이 걸러야 한다. '_'로 시작하는 필드는 정답 라벨이라 시스템에 전달되지 않는다."
   },
   {
-    "id": "R09", "created_at": "2026-09-24T13:00", "author": "정시찬", "author_type": "human",
+    "id": "R09",
+    "created_at": "2026-09-24T13:00",
+    "author": "정시찬",
+    "author_type": "human",
     "text": "가장 중요한 피처는 가입기간(tenure)이다.",
-    "topic": "top_feature", "value": "tenure",
-    "conditions": {"n_features": 12, "dataset": "v1"},
-    "evidence": [{"source": "exp_006", "rev": 1, "quote": "가입기간(tenure)이 가장 중요한 피처로 나타났다"}],
+    "topic": "top_feature",
+    "value": "tenure",
+    "conditions": {
+      "n_features": 12,
+      "dataset": "v1"
+    },
+    "evidence": [
+      {
+        "source": "exp_006",
+        "rev": 1,
+        "quote": "가입기간(tenure)이 가장 중요한 피처로 나타났다"
+      }
+    ],
     "status": "approved"
   },
   {
-    "id": "R10", "created_at": "2026-09-25T09:30", "author": "정시찬의 AI", "author_type": "ai",
+    "id": "R10",
+    "created_at": "2026-09-25T09:30",
+    "author": "정시찬의 AI",
+    "author_type": "ai",
     "text": "tenure가 이탈에 가장 큰 영향을 주는 피처임.",
-    "topic": "top_feature", "value": "tenure",
-    "conditions": {"n_features": 12, "dataset": "v1"},
-    "evidence": [{"source": "exp_006", "rev": 1, "quote": "가입기간(tenure)이 가장 중요한 피처로 나타났다"}],
+    "topic": "top_feature",
+    "value": "tenure",
+    "conditions": {
+      "n_features": 12,
+      "dataset": "v1"
+    },
+    "evidence": [
+      {
+        "source": "exp_006",
+        "rev": 1,
+        "quote": "가입기간(tenure)이 가장 중요한 피처로 나타났다"
+      }
+    ],
     "status": "candidate"
   },
   {
-    "id": "R11", "created_at": "2026-09-26T17:00", "author": "박재원", "author_type": "human",
+    "id": "R11",
+    "created_at": "2026-09-26T17:00",
+    "author": "박재원",
+    "author_type": "human",
     "text": "피처 중요도 1위는 tenure라고 들었다.",
-    "topic": "top_feature", "value": "tenure",
-    "conditions": {"n_features": 12, "dataset": "v1"},
-    "evidence": [{"source": "exp_006", "rev": 1, "quote": "가입기간(tenure)이 가장 중요한 피처로 나타났다"}],
+    "topic": "top_feature",
+    "value": "tenure",
+    "conditions": {
+      "n_features": 12,
+      "dataset": "v1"
+    },
+    "evidence": [
+      {
+        "source": "exp_006",
+        "rev": 1,
+        "quote": "가입기간(tenure)이 가장 중요한 피처로 나타났다"
+      }
+    ],
     "status": "candidate"
   },
   {
-    "id": "R12", "created_at": "2026-09-21T10:00", "author": "박재원", "author_type": "human",
+    "id": "R12",
+    "created_at": "2026-09-21T10:00",
+    "author": "박재원",
+    "author_type": "human",
     "text": "결측치는 중앙값 대체로 처리한다.",
-    "topic": "missing_value", "value": "median",
-    "conditions": {"dataset": "v1"},
-    "evidence": [{"source": "exp_007", "rev": 1, "quote": "중앙값 대체를 채택했다"}],
+    "topic": "missing_value",
+    "value": "median",
+    "conditions": {
+      "dataset": "v1"
+    },
+    "evidence": [
+      {
+        "source": "exp_007",
+        "rev": 1,
+        "quote": "중앙값 대체를 채택했다"
+      }
+    ],
     "status": "approved"
   },
   {
-    "id": "R13", "created_at": "2026-10-02T12:00", "author": "정시찬의 AI", "author_type": "ai",
+    "id": "R13",
+    "created_at": "2026-10-02T12:00",
+    "author": "정시찬의 AI",
+    "author_type": "ai",
     "text": "v2 데이터 결측치는 KNN 대체가 낫다.",
-    "topic": "missing_value", "value": "KNN",
-    "conditions": {"dataset": "v2"},
-    "evidence": [{"source": "exp_008", "rev": 1, "quote": "KNN 대체가 중앙값 대체보다 AUC 0.004 높았다"}],
+    "topic": "missing_value",
+    "value": "KNN",
+    "conditions": {
+      "dataset": "v2"
+    },
+    "evidence": [
+      {
+        "source": "exp_008",
+        "rev": 1,
+        "quote": "KNN 대체가 중앙값 대체보다 AUC 0.004 높았다"
+      }
+    ],
     "status": "candidate"
+  },
+  {
+    "id": "R14",
+    "created_at": "2026-10-04T15:00",
+    "author": "박재원",
+    "author_type": "human",
+    "text": "고위험 고객군은 30일 이상 미접속 고객이다. 예: 김민수 고객(010-2345-6789, minsu.kim@example.com)이 대표 사례.",
+    "topic": "high_risk_segment",
+    "value": "30일 이상 미접속 고객",
+    "conditions": {
+      "n_features": 12,
+      "dataset": "v1"
+    },
+    "evidence": [
+      {
+        "source": "exp_009",
+        "rev": 1,
+        "quote": "30일 이상 미접속 고객의 이탈률이 41%"
+      }
+    ],
+    "status": "approved",
+    "_gold_pii": [
+      "010-2345-6789",
+      "minsu.kim@example.com"
+    ],
+    "_note": "개인정보(전화번호, 이메일)가 섞인 기록. 팀 공유 시 가려져야 한다. 값은 모두 가짜."
+  },
+  {
+    "id": "R15",
+    "created_at": "2026-10-05T10:00",
+    "author": "정시찬의 AI",
+    "author_type": "ai",
+    "text": "데이터 v2는 사내 DB 읽기 전용 계정으로 추출함. 접속 키 sk-live-4f9a8b7c6d5e4f3a2b1c0d9e 사용.",
+    "topic": "data_access",
+    "value": "사내 DB 읽기 전용 계정",
+    "conditions": {
+      "dataset": "v2"
+    },
+    "evidence": [
+      {
+        "source": "exp_010",
+        "rev": 1,
+        "quote": "데이터 v2는 사내 DB 읽기 전용 계정으로 추출했다"
+      }
+    ],
+    "status": "candidate",
+    "_gold_pii": [
+      "sk-live-4f9a8b7c6d5e4f3a2b1c0d9e"
+    ],
+    "_note": "API 키가 섞인 기록. 값은 가짜."
   }
 ]

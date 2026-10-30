@@ -19,10 +19,11 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 
 ABLATIONS = {
-    "harness-no_conditions": ComposerConfig(use_conditions=False),
-    "harness-no_verifier": ComposerConfig(use_verifier=False),
-    "harness-no_dedup": ComposerConfig(use_dedup=False),
-    "harness-no_approval": ComposerConfig(use_approval=False),
+    "harness-no_conditions": {"cfg": ComposerConfig(use_conditions=False)},
+    "harness-no_verifier": {"cfg": ComposerConfig(use_verifier=False)},
+    "harness-no_dedup": {"cfg": ComposerConfig(use_dedup=False)},
+    "harness-no_approval": {"cfg": ComposerConfig(use_approval=False)},
+    "harness-no_pii": {"use_pii": False},
 }
 
 
@@ -30,7 +31,7 @@ def build(name: str):
     if name == "harness":
         return Harness(DATA / "sources")
     if name in ABLATIONS:
-        h = Harness(DATA / "sources", cfg=ABLATIONS[name])
+        h = Harness(DATA / "sources", **ABLATIONS[name])
         h.name = name
         return h
     if name == "retrieval_only":
@@ -76,7 +77,7 @@ def main() -> None:
             details.append({"query": g["id"], "question": g["question"], "expected": g["expected_status"],
                             "status": resp.status, "supporting": resp.supporting_ids,
                             "team_facts": resp.team_fact_ids, "independent": resp.independent_evidence,
-                            "answer": resp.answer, "notes": resp.notes,
+                            "answer": resp.answer, "notes": resp.notes, "exposed": resp.exposed,
                             "condition_match": s.condition_match})
             if args.verbose:
                 mark = "O" if s.condition_match else "X"
@@ -89,11 +90,13 @@ def main() -> None:
             json.dumps({"summary": summary, "details": details}, ensure_ascii=False, indent=2), encoding="utf-8")
         if hasattr(system, "verifier"):
             print(f"[{name}] 인용 검증 캐시: {system.verifier.stats}")
+        if getattr(system, "pii_guard", None) is not None:
+            print(f"[{name}] PII 차단: {system.pii_guard.stats}")
         if hasattr(system, "close"):
             system.close()
 
     cols = ["condition_match", "status_acc", "overgeneralization", "false_consensus",
-            "bad_citation_used", "evidence_error"]
+            "bad_citation_used", "evidence_error", "pii_leak"]
     print("\n| system | " + " | ".join(cols) + " |")
     print("|---|" + "---|" * len(cols))
     for name, s in table:

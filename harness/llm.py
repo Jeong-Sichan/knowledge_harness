@@ -101,3 +101,18 @@ def full_context_answer(question: str, records_table: list[dict]) -> LLMAnswer:
         "independent_evidence는 서로 독립인 근거 수다.\n\n"
         f"<records>{json.dumps(records_table, ensure_ascii=False)}</records>\n<question>{question}</question>")
     return _parse(LARGE_MODEL, prompt, LLMAnswer)
+
+
+# ---------- PII 차단: 형식 없는 민감 정보(이름 등) 찾기 (작은 모델) ----------
+
+class PIISpans(BaseModel):
+    spans: list[str]
+
+
+def detect_pii_spans(text: str) -> list[str]:
+    """`PIIGuard(llm_detector=detect_pii_spans)`로 연결한다. 정규식이 못 잡는 실명·주소 등을 찾는다."""
+    prompt = (
+        "아래 팀 기록에서 개인을 식별할 수 있는 정보(실명, 주소, 계정명 등)를 원문 그대로 뽑아라. "
+        "모델명·수치·실험 조건은 개인정보가 아니다. 없으면 빈 목록.\n\n"
+        f"<record>{text}</record>")
+    return _parse(SMALL_MODEL, prompt, PIISpans).spans

@@ -24,4 +24,5 @@ class RetrievalOnly:
             return Response(NO_EVIDENCE, [], [], 0, answer="관련 기록이 없습니다.")
         ids = [r.id for r in hits]
         return Response(ANSWERED, ids, ids, len(hits),
-                        answer=f"{hits[0].value} (관련 기록 {len(hits)}건)")
+                        answer=f"{hits[0].value} (관련 기록 {len(hits)}건)",
+                        exposed=[r.text for r in hits])

@@ -28,19 +28,20 @@ def record_text(r: Record) -> str:
 
 
 class BM25:
-    def __init__(self, docs: list[str], k1: float = 1.5, b: float = 0.75):
+    def __init__(self, docs: list[str], k1: float = 1.5, b: float = 0.75, tokenizer=None):
         self.k1, self.b = k1, b
-        self.toks = [tokenize(d) for d in docs]
+        self.tokenizer = tokenizer or tokenize
+        self.toks = [self.tokenizer(d) for d in docs]
+        self.tfs = [Counter(doc) for doc in self.toks]
         self.avgdl = sum(map(len, self.toks)) / max(1, len(self.toks))
         df = Counter(t for doc in self.toks for t in set(doc))
         n = len(self.toks)
         self.idf = {t: math.log(1 + (n - f + 0.5) / (f + 0.5)) for t, f in df.items()}
 
     def scores(self, query: str) -> list[float]:
-        q = tokenize(query)
+        q = self.tokenizer(query)
         out = []
-        for doc in self.toks:
-            tf = Counter(doc)
+        for doc, tf in zip(self.toks, self.tfs):
             s = 0.0
             for t in q:
                 if t in tf:

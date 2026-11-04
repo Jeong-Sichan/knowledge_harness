@@ -162,6 +162,19 @@ python -m eval.run_eval --answerer llm --scale 300 --systems retrieval_only,full
 
 ---
 
+### 외부 벤치마크: GroupMemBench 작은 세트 (`groupmem/`)
+
+[GroupMemBench](https://github.com/UCSB-NLP-Chang/GroupMemBench)(팀 채널 대화 기억 벤치마크) Finance 도메인에서 knowledge_update 8문항과 abstention 8문항을 골라, 근거 메시지와 방해 메시지 약 125개짜리 작은 세트를 만들어 비교한다.
+- 채점은 GroupMemBench의 답변·판정 프롬프트를 그대로 쓴다.
+- 데이터는 저장소에 넣지 않는다. 각자 GroupMemBench를 받아 경로를 넘긴다.
+
+```bash
+git clone https://github.com/UCSB-NLP-Chang/GroupMemBench ../GroupMemBench
+python -m groupmem.run --gmb ../GroupMemBench --systems bm25,harness
+python -m groupmem.run --gmb ../GroupMemBench --systems graphiti        # 다른 터미널에서 동시에
+python -m groupmem.run --gmb ../GroupMemBench --systems graphiti_tuned  # 다른 터미널에서 동시에
+```
+
 ## 5. 지금까지의 결과
 
 ### 공정 비교 + 규모 실험 (`llm` 모드, 질문 14개)

@@ -186,6 +186,30 @@ def answer(question: str, context: list[str]) -> LLMAnswer:
     return _parse(ANSWER_MODEL, prompt, LLMAnswer)
 
 
+# ---------- 자유 형식 대화 호출 (외부 벤치마크의 답변·판정 프롬프트를 그대로 쓸 때) ----------
+
+def chat_text(model: str, system: str, user: str, max_tokens: int = 2000) -> str:
+    """system + user 메시지로 한 번 묻고 글 그대로 받는다. 같은 입력은 디스크 캐시를 쓴다(OpenAI 전용)."""
+    key = hashlib.sha256(f"chat|{PROVIDER}|{model}|{system}|{user}".encode()).hexdigest()
+    cache = _load_cache()
+    if key in cache:
+        stats["cache_hits"] += 1
+        return cache[key]["text"]
+    stats["calls"] += 1
+    global _client
+    if _client is None:
+        from openai import OpenAI
+        _client = OpenAI()
+    # 최신 추론 모델은 temperature를 받지 않고, 추론 토큰도 max_completion_tokens에 포함된다
+    resp = _client.chat.completions.create(
+        model=model, max_completion_tokens=max_tokens,
+        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])
+    text = resp.choices[0].message.content or ""
+    cache[key] = {"text": text}
+    _save_cache()
+    return text
+
+
 # ---------- PII 차단: 형식 없는 민감 정보(이름 등) 찾기 (작은 모델) ----------
 
 class PIISpans(BaseModel):

@@ -56,9 +56,9 @@ def build(name: str, answerer: str, src: Path = DATA / "sources"):
             raise ValueError("full_context_llm은 --answerer llm 에서만 돈다")
         from baselines.full_context_llm import FullContextLLM
         return FullContextLLM(src)
-    if name == "graphiti":
+    if name in ("graphiti", "graphiti_tuned"):
         from baselines.graphiti_baseline import GraphitiBaseline
-        return GraphitiBaseline(src, answerer=answerer)
+        return GraphitiBaseline(src, answerer=answerer, tuned=name == "graphiti_tuned")
     raise ValueError(f"알 수 없는 시스템: {name}")
 
 

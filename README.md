@@ -164,15 +164,35 @@ python -m eval.run_eval --answerer llm --scale 300 --systems retrieval_only,full
 
 ### 외부 벤치마크: GroupMemBench 작은 세트 (`groupmem/`)
 
-[GroupMemBench](https://github.com/UCSB-NLP-Chang/GroupMemBench)(팀 채널 대화 기억 벤치마크) Finance 도메인에서 knowledge_update 8문항과 abstention 8문항을 골라, 근거 메시지와 방해 메시지 약 125개짜리 작은 세트를 만들어 비교한다.
-- 채점은 GroupMemBench의 답변·판정 프롬프트를 그대로 쓴다.
+[GroupMemBench](https://github.com/UCSB-NLP-Chang/GroupMemBench)(팀 채널 대화 기억 벤치마크)에서 질문 100개짜리 작은 세트를 만들어 비교한다.
+- Finance: knowledge_update(결정이 바뀐 뒤 현재 결정을 묻는 질문) 31개 + abstention(기록에 없는 걸 묻는 질문) 29개, 메시지 약 450개
+- Technology: knowledge_update 20개 + abstention 20개, 메시지 약 310개
+- 메시지 = 근거 메시지(바뀐 결정, 이전 결정, 그 답글 대상) + 질문마다 전체 도메인에서 BM25로 뽑은 방해 메시지 6개
+- 채점은 GroupMemBench의 답변·판정 프롬프트를 그대로 쓴다. 답변·판정 모델은 모든 시스템에 같다.
 - 데이터는 저장소에 넣지 않는다. 각자 GroupMemBench를 받아 경로를 넘긴다.
+
+비교 시스템:
+
+| 이름 | 하는 일 |
+|---|---|
+| `bm25` | GroupMemBench의 BM25 베이스라인과 같은 방식(상위 10개) |
+| `harness` | 범위 지정(질문이 말한 단계·주제·채널만) + 근거 판정(작은 LLM이 현재 결정·대체된 결정·답할 수 있는지 판정, 질문당 1회) |
+| `harness-no_scope` | 범위 지정을 끈 버전(효과 분리) |
+| `harness-no_judge` | 근거 판정을 끈 버전(효과 분리) |
+| `graphiti` / `graphiti_tuned` | Graphiti 기본 / 맞춤 스키마(단계·주제·역할·메시지 번호) |
 
 ```bash
 git clone https://github.com/UCSB-NLP-Chang/GroupMemBench ../GroupMemBench
-python -m groupmem.run --gmb ../GroupMemBench --systems bm25,harness
-python -m groupmem.run --gmb ../GroupMemBench --systems graphiti        # 다른 터미널에서 동시에
-python -m groupmem.run --gmb ../GroupMemBench --systems graphiti_tuned  # 다른 터미널에서 동시에
+# 터미널 1: LLM 없이 입력하는 시스템들 (도메인마다)
+python -m groupmem.run --gmb ../GroupMemBench --domain Finance --systems bm25,harness,harness-no_scope,harness-no_judge
+python -m groupmem.run --gmb ../GroupMemBench --domain Technology --n-ku 20 --n-abs 20 --systems bm25,harness,harness-no_scope,harness-no_judge
+# 터미널 2~5: Graphiti는 입력이 오래 걸리니 따로 동시에
+python -m groupmem.run --gmb ../GroupMemBench --domain Finance --systems graphiti
+python -m groupmem.run --gmb ../GroupMemBench --domain Finance --systems graphiti_tuned
+python -m groupmem.run --gmb ../GroupMemBench --domain Technology --n-ku 20 --n-abs 20 --systems graphiti
+python -m groupmem.run --gmb ../GroupMemBench --domain Technology --n-ku 20 --n-abs 20 --systems graphiti_tuned
+# 모두 끝나면: 시스템별 정답률, 95% 신뢰구간, bm25 대비 맞비교 검정(McNemar), 맥락 크기, LLM 호출 수
+python -m groupmem.summarize
 ```
 
 ## 5. 지금까지의 결과

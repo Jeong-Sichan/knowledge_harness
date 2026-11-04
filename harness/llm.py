@@ -186,6 +186,31 @@ def answer(question: str, context: list[str]) -> LLMAnswer:
     return _parse(ANSWER_MODEL, prompt, LLMAnswer)
 
 
+# ---------- 근거 판정: 대화형 데이터에서 질문 시점에 관계·상태를 판정 (작은 모델) ----------
+
+class EvidenceJudgment(BaseModel):
+    relevant_ids: list[str]
+    current_ids: list[str]
+    superseded_ids: list[str]
+    answerable: bool
+    missing: str
+
+
+JUDGE_INSTRUCTIONS = """너는 팀 기록 하네스의 근거 판정 모듈이다. 질문에 답하지 말고, 아래 메시지들이 질문에 대해 어떤 근거인지만 판정한다.
+- relevant_ids: 질문이 묻는 바로 그 사안(같은 대상, 같은 단계·주제)을 직접 다루는 메시지 번호
+- current_ids: 그중 지금 유효한 결정이나 상태를 담은 메시지. 나중 메시지가 앞선 결정을 바꾸거나 다시 열었다면 바뀐 쪽이 현재다
+- superseded_ids: 나중 메시지에 의해 바뀌거나 대체된 이전 결정 메시지
+- answerable: 질문이 묻는 구체적인 정보(이름, 날짜, 수치, 결정 내용 등)가 메시지에 실제로 적혀 있으면 true. 같은 주제를 다루기만 하고 그 정보가 없으면 false
+- missing: answerable이 false일 때 무엇이 없는지 한 문장. true면 빈 문자열
+메시지 번호는 msg_node 값을 그대로 쓴다."""
+
+
+def judge_evidence(question: str, asker: str, passages: list[str]) -> EvidenceJudgment:
+    prompt = (JUDGE_INSTRUCTIONS + "\n\n<messages>\n" + "\n\n".join(passages) + "\n</messages>\n"
+              f"<asking_user>{asker}</asking_user>\n<question>{question}</question>")
+    return _parse(SMALL_MODEL, prompt, EvidenceJudgment)
+
+
 # ---------- 자유 형식 대화 호출 (외부 벤치마크의 답변·판정 프롬프트를 그대로 쓸 때) ----------
 
 def chat_text(model: str, system: str, user: str, max_tokens: int = 2000) -> str:

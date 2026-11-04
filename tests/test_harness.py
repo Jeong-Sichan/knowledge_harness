@@ -162,3 +162,38 @@ def test_scale_distractors_keep_gold_valid():
             Path(d, f"{sid}.md").write_text(text, encoding="utf-8")
         v = CitationVerifier(SourceStore(d))
         assert all(v.verify(Evidence(**r["evidence"][0])) for r in recs)
+
+
+def test_tuned_graphiti_passes_schema_and_shows_attributes(monkeypatch):
+    """튜닝된 Graphiti: 맞춤 스키마·추출 지시를 넘기고, 뽑힌 속성을 답변기 맥락에 싣는지 (Neo4j 없이)."""
+    import pytest
+    pytest.importorskip("graphiti_core")
+    from types import SimpleNamespace as NS
+    from baselines.graphiti_baseline import GraphitiBaseline, TeamFinding
+    from harness import llm
+
+    seen = {}
+
+    class FakeGraphiti:
+        async def build_indices_and_constraints(self): pass
+        async def add_episode(self, **kw):
+            seen.update(kw)
+            return NS(episode=NS(uuid="ep1"), edges=[])
+        async def search(self, query, group_ids=None, num_results=10):
+            return [NS(fact="R01: 피처 12개, v1에서 XGBoost가 가장 좋다", episodes=["ep1"], invalid_at=None,
+                       expired_at=None, attributes={"n_features": 12, "dataset": "v1",
+                                                    "approval_status": "approved", "author_type": None})]
+        async def close(self): pass
+
+    contexts = []
+    monkeypatch.setattr(llm, "answer", lambda q, ctx: contexts.append(ctx) or llm.LLMAnswer(
+        status="answered", supporting_ids=["R01"], team_fact_ids=["R01"], independent_evidence=1, answer="x"))
+    recs = [Record.from_dict(r) for r in json.loads((DATA / "records.json").read_text(encoding="utf-8"))][:1]
+    gb = GraphitiBaseline(DATA / "sources", answerer="llm", graphiti=FakeGraphiti(), group_id="t", tuned=True)
+    gb.ingest(recs)
+    gb.ask(Query("x", "모델?"))
+    assert gb.name == "graphiti_tuned"
+    assert seen["edge_types"] == {"TeamFinding": TeamFinding} and "조건" in seen["custom_extraction_instructions"]
+    assert "approval_status=approved" in contexts[0][0] and "dataset=v1" in contexts[0][0]
+    assert "author_type" not in contexts[0][0]  # 비어 있는 속성은 싣지 않는다
+    gb.close()

@@ -157,6 +157,7 @@ python -m eval.run_eval --answerer llm --scale 300 --systems retrieval_only,full
 - 기본 모델은 Graphiti 기본값과 같은 `gpt-6-luna`다. `HARNESS_ANSWER_MODEL`, `HARNESS_SMALL_MODEL`로 바꿀 수 있다.
 - LLM 응답은 `.cache/llm_cache.json`에 저장된다. 다시 돌리면 저장된 응답을 재사용해 비용이 들지 않는다.
 - `--scale N`은 주제와 문장은 비슷하지만 조건이 다른 방해 기록 N개를 섞는다. 정답은 그대로 유효하다.
+- `graphiti_tuned`는 Graphiti에 맞춤 스키마(사실마다 조건·승인 상태·작성자 유형 속성)와 추출 지시를 준 버전이다. 기본 설정 Graphiti가 요약하며 메타데이터를 잃는 문제를 Graphiti 자체 기능으로 최대한 보완한 "강한" 베이스라인이다.
 - Graphiti는 Neo4j와 `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` 환경변수가 필요하다. 먼저 `python -m scripts.graphiti_smoke`로 연결을 확인한다.
 
 ---

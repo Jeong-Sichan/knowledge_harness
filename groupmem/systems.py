@@ -3,8 +3,8 @@
 - bm25: GroupMemBench의 BM25 베이스라인과 같은 방식(내용만 색인, 상위 k개)
 - harness: 우리 하네스의 대화용 어댑터. 기록 입력 때 LLM을 쓰지 않고 공개 메타데이터만 쓴다.
     1. 범위 지정(조건 필터): 질문이 단계·주제·채널 이름을 말하면 그 범위의 메시지만 근거로 쓴다
-    2. 최신성 표시(관계 판정): 같은 단계·주제 안에서 더 나중 메시지가 있으면 이전 메시지에 표시한다
-    3. 범위 안에 근거가 없으면 그 사실을 답변기에 알린다(근거 없음 판정)
+    2. 근거 판정: 질문 시점에 작은 LLM이 현재 결정·대체된 결정·답할 수 있는지를 판정한다
+  (기록 입력 때는 LLM을 쓰지 않는다. 시간순 "최신" 표시는 결정 뒤에도 대화가 이어져 틀리므로 뺐다)
   인용 검증·재인용 묶기는 이 데이터에 원문 문서와 인용이 없어 쓰지 않는다.
 - graphiti / graphiti_tuned: 메시지를 에피소드로 넣고 사실(edge)을 검색한다. 무효 처리된 사실은 뺀다.
   튜닝 버전은 사실마다 단계·주제·역할·메시지 번호·시각을 속성으로 뽑는 맞춤 스키마와 추출 지시를 준다.
@@ -59,42 +59,64 @@ class BM25System:
 
 
 class HarnessGMB(BM25System):
+    """대화 데이터용 하네스. 기록 입력 때는 LLM을 쓰지 않고, 질문 시점에 두 단계를 거친다.
+
+    1. 범위 지정(scope): 질문이 단계·주제·채널 이름을 말하면 그 범위의 메시지만 후보로 남긴다(규칙)
+    2. 근거 판정(judge): 작은 LLM이 후보를 읽고 관련 메시지, 현재 결정, 대체된 결정, 답할 수 있는지를 판정한다
+       (원래 하네스의 관계 판정·상태 판정을 대화 데이터로 옮긴 것. 단어 규칙으로는 결정 변경을 거의 못 찾아서 LLM을 쓴다)
+    답변기에는 판정 결과와 함께 현재 결정 → 관련 메시지 → 대체된 결정 순으로, 각각 표시를 붙여 넘긴다.
+    scope / judge 를 끄면 효과 분리 실험(ablation)이 된다.
+    """
+
     name = "harness"
 
-    def __init__(self, k: int = 10, pool: int = 30):
+    def __init__(self, k: int = 10, pool: int = 30, candidates: int = 20, scope: bool = True, judge: bool = True):
         super().__init__(k)
-        self.pool = pool
+        self.pool, self.candidates, self.use_scope, self.use_judge = pool, candidates, scope, judge
+        self.name = "harness" + ("" if scope else "-no_scope") + ("" if judge else "-no_judge")
+        self.last_judgment = None
 
     def ingest(self, msgs: list[dict]) -> None:
         super().ingest(msgs)
+        self.by_id = {m["msg_node"]: m for m in msgs}
         self.scopes = {s for m in msgs for s in (m["phase_name"], m["topic"], m["_channel"]) if s}
 
     def retrieve(self, question: str, asker: str) -> tuple[list[str], list[str]]:
         pool = [self.msgs[i] for i in self.ranked(query_text(question, asker))[: self.pool]]
-        q = question.lower()
-        named = sorted(s for s in self.scopes if s.lower() in q)
         notes = []
-        if named:
+        if self.use_scope:
+            named = sorted(s for s in self.scopes if s.lower() in question.lower())
             scoped = [m for m in pool if {m["phase_name"], m["topic"], m["_channel"]} & set(named)]
-            notes.append("질문이 가리키는 범위: " + ", ".join(named))
-            if not scoped:
-                notes.append("그 범위의 메시지가 검색되지 않았다. 다른 범위의 메시지로 답을 일반화하지 말고, "
-                             "근거가 없으면 없다고 답한다.")
-            pool = scoped or pool
-        top = pool[: self.k]
-        # 같은 단계·주제 안에서는 최신 메시지를 먼저, 이전 메시지에는 표시를 붙인다
-        latest: dict[tuple, str] = {}
-        for m in top:
-            g = (m["phase_name"], m["topic"])
-            latest[g] = max(latest.get(g, ""), m["timestamp"])
-        top.sort(key=lambda m: (m["phase_name"], m["topic"], m["timestamp"]), reverse=True)
-        passages = []
-        for m in top:
-            mark = ("[최신: 같은 단계·주제에서 가장 나중 메시지]" if m["timestamp"] == latest[(m["phase_name"], m["topic"])]
-                    else "[이전: 같은 단계·주제에 더 나중 메시지가 있어 대체되었을 수 있음]")
-            passages.append(f"{mark} {format_passage(m)}")
-        notes.append("같은 단계·주제에서는 더 나중 메시지가 이전 결정을 바꿀 수 있다. '현재' 상태를 물으면 최신 메시지를 따른다.")
-        return ["[하네스 안내] " + " ".join(notes)] + passages, [m["msg_node"] for m in top]
+            if named and scoped:
+                pool = scoped
+                notes.append("질문이 가리키는 범위: " + ", ".join(named))
+        self.last_judgment = None
+        if not self.use_judge:
+            top = pool[: self.k]
+            head = ["[하네스 안내] " + " ".join(notes)] if notes else []
+            return head + [format_passage(m) for m in top], [m["msg_node"] for m in top]
+
+        from harness import llm
+
+        cands = pool[: self.candidates]
+        j = llm.judge_evidence(question, asker, [format_passage(m) for m in cands])
+        self.last_judgment = j
+        known = {m["msg_node"] for m in cands}
+        cur = [i for i in j.current_ids if i in known]
+        sup = [i for i in j.superseded_ids if i in known and i not in cur]
+        rel = [i for i in j.relevant_ids if i in known and i not in cur and i not in sup]
+        if j.answerable:
+            notes.append("근거 판정: 질문이 묻는 정보가 아래 메시지에 있다. '현재'를 물으면 [현재 결정] 표시를 따른다.")
+        else:
+            notes.append(f"근거 판정: 질문이 묻는 정보가 팀 기록에 없다({j.missing}). 비슷한 주제의 메시지로 답을 지어내지 말고 "
+                         "정보가 없다고 답한다.")
+        ordered = [(i, "[현재 결정]") for i in cur] + [(i, "[관련]") for i in rel] + \
+                  [(i, "[대체됨: 나중 메시지가 이 결정을 바꿈]") for i in sup]
+        if not j.answerable:  # 근거 없음이면 참고용으로 가장 관련 있는 몇 개만
+            ordered = ordered[:3]
+        ordered = ordered[: self.k]
+        passages = ["[하네스 안내] " + " ".join(notes)] + [f"{mark} {format_passage(self.by_id[i])}" for i, mark in ordered]
+        return passages, [i for i, _ in ordered]
 
 
 class ChannelFact(BaseModel):

@@ -197,3 +197,31 @@ def test_tuned_graphiti_passes_schema_and_shows_attributes(monkeypatch):
     assert "approval_status=approved" in contexts[0][0] and "dataset=v1" in contexts[0][0]
     assert "author_type" not in contexts[0][0]  # 비어 있는 속성은 싣지 않는다
     gb.close()
+
+
+def test_groupmem_harness_marks_current_and_abstains(monkeypatch):
+    from harness import llm
+    from groupmem.systems import HarnessGMB
+
+    def msg(i, phase, text):
+        return {"msg_node": f"Msg_{i}", "author": "a", "role": "PM", "_channel": "general", "phase_name": phase,
+                "topic": "funding", "timestamp": f"2025-01-0{i}T00:00:00", "reply_to": None, "content": text}
+
+    msgs = [msg(1, "Kickoff", "budget cap is 10k"), msg(2, "Kickoff", "update: budget cap is now 12k"),
+            msg(3, "Review", "budget cap for review is 5k")]
+    verdict = {"answerable": True}
+
+    def fake_judge(question, asker, passages):
+        assert all("phase_name=Kickoff" in p for p in passages)  # 범위 지정: 질문이 말한 단계만 남는다
+        return llm.EvidenceJudgment(relevant_ids=[], current_ids=["Msg_2", "Msg_99"], superseded_ids=["Msg_1"],
+                                    answerable=verdict["answerable"], missing="없음")
+
+    monkeypatch.setattr(llm, "judge_evidence", fake_judge)
+    h = HarnessGMB()
+    h.ingest(msgs)
+    passages, ids = h.retrieve("What is the budget cap in Kickoff now?", "u1")
+    assert ids == ["Msg_2", "Msg_1"]                  # 모르는 번호(Msg_99)는 버리고 현재 → 대체됨 순
+    assert passages[1].startswith("[현재 결정]") and passages[2].startswith("[대체됨")
+    verdict["answerable"] = False
+    passages, _ = h.retrieve("What is the budget cap in Kickoff now?", "u1")
+    assert "정보가 없다고 답한다" in passages[0]

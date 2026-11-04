@@ -45,10 +45,12 @@ def mcnemar_p(b: int, c: int) -> float:
 def load(out: Path) -> dict[str, list[dict]]:
     rows = defaultdict(list)
     for path in sorted(out.glob("gmb_*_*.jsonl")):
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                r = json.loads(line)
-                rows[r["system"]].append(r)
+        recs = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        if not recs or "system" not in recs[0] or "domain" not in recs[0]:
+            print(f"건너뜀: {path.name} (이전 16문항 실험 형식이라 합치지 않음)")
+            continue
+        for r in recs:
+            rows[r["system"]].append(r)
     return rows
 
 

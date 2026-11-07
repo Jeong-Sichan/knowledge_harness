@@ -5,3 +5,5 @@ results/
 .venv/
 .env
 .cache/
+data/
+datasets/
